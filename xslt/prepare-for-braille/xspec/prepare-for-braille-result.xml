@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="file:/home/statped/Dokumenter/produksjonssystem/tests/tools/xspec/src/compiler/format-xspec-report.xsl"?>
+<x:report xmlns:xsl="http://www.w3.org/1999/XSL/Transform"
+          xmlns:xs="http://www.w3.org/2001/XMLSchema"
+          xmlns:test="http://www.jenitennison.com/xslt/unit-test"
+          xmlns:x="http://www.jenitennison.com/xslt/xspec"
+          xmlns:epub="http://www.idpf.org/2007/ops"
+          xmlns="http://www.w3.org/1999/xhtml"
+          stylesheet="file:/home/statped/Dokumenter/produksjonssystem/xslt/prepare-for-braille/prepare-for-braille.xsl"
+          date="2020-11-16T17:57:30.807+01:00"
+          xspec="file:/home/statped/Dokumenter/produksjonssystem/xslt/./prepare-for-braille/prepare-for-braille.xspec">
+   <x:scenario>
+      <x:label>Remove newlines from title elements (test for https://github.com/nlbdev/pipeline/issues/226)</x:label>
+      <x:context xml:space="preserve"><title>  Test
+        test  </title></x:context>
+      <x:result>
+         <title>Test test</title>
+      </x:result>
+      <x:test successful="true">
+         <x:label>the result should be as expected</x:label>
+         <x:expect>
+            <title>Test test</title>
+         </x:expect>
+      </x:test>
+   </x:scenario>
+   <x:scenario>
+      <x:label>Make sure that there's whitespace after sup and sub (test for https://github.com/nlbdev/pipeline/issues/227)</x:label>
+      <x:context>
+         <div>
+            <p xml:space="preserve">xxx <sup>yyy</sup> zzz</p>
+            <p xml:space="preserve">xxx<sup>yyy</sup> zzz</p>
+            <p xml:space="preserve">xxx <sup>yyy</sup>zzz</p>
+            <p xml:space="preserve">xxx<sup>yyy</sup>zzz</p>
+            <p xml:space="preserve">xxx <sub>yyy</sub> zzz</p>
+            <p xml:space="preserve">xxx<sub>yyy</sub> zzz</p>
+            <p xml:space="preserve">xxx <sub>yyy</sub>zzz</p>
+            <p xml:space="preserve">xxx<sub>yyy</sub>zzz</p>
+            <p xml:space="preserve">xxx <sup>yyy</sup><span> zzz</span></p>
+            <p xml:space="preserve">xxx <sup>yyy</sup><span>zzz</span></p>
+            <p xml:space="preserve">xxx <sub>yyy</sub><span> zzz</span></p>
+            <p xml:space="preserve">xxx <sub>yyy</sub><span>zzz</span></p>
+            <p xml:space="preserve">xxx <sup>yyy</sup> <span>zzz</span></p>
+            <p xml:space="preserve">xxx <sup>yyy</sup><span>zzz</span></p>
+            <p xml:space="preserve">xxx <sub>yyy</sub> <span>zzz</span></p>
+            <p xml:space="preserve">xxx <sub>yyy</sub><span>zzz</span></p>
+            <p xml:space="preserve">xxx <span><sup>yyy</sup></span><span>zzz</span></p>
+            <p xml:space="preserve">xxx <span><sup>yyy</sup> </span><span>zzz</span></p>
+            <p xml:space="preserve">xxx <span><sub>yyy</sub></span><span>zzz</span></p>
+            <p xml:space="preserve">xxx <span><sub>yyy</sub> </span><span>zzz</span></p>
+            <p xml:space="preserve">xxx <span><sup>yyy</sup></span> <span>zzz</span></p>
+            <p xml:space="preserve">xxx <span><sup>yyy</sup> </span> <span>zzz</span></p>
+            <p xml:space="preserve">xxx <span><sub>yyy</sub></span> <span>zzz</span></p>
+            <p xml:space="preserve">xxx <span><sub>yyy</sub> </span> <span>zzz</span></p>
+         </div>
+      </x:context>
+      <x:result>
+         <div>
+            <p xml:space="preserve">xxx <sup>yyy</sup> zzz</p>
+            <p xml:space="preserve">xxx<sup>yyy</sup> zzz</p>
+            <p xml:space="preserve">xxx <sup>yyy</sup> zzz</p>
+            <p xml:space="preserve">xxx<sup>yyy</sup> zzz</p>
+            <p xml:space="preserve">xxx <sub>yyy</sub> zzz</p>
+            <p xml:space="preserve">xxx<sub>yyy</sub> zzz</p>
+            <p xml:space="preserve">xxx <sub>yyy</sub> zzz</p>
+            <p xml:space="preserve">xxx<sub>yyy</sub> zzz</p>
+            <p xml:space="preserve">xxx <sup>yyy</sup><span> zzz</span></p>
+            <p xml:space="preserve">xxx <sup>yyy</sup><test:ws xmlns:pkg="http://expath.org/ns/pkg"> </test:ws><span>zzz</span></p>
+            <p xml:space="preserve">xxx <sub>yyy</sub><span> zzz</span></p>
+            <p xml:space="preserve">xxx <sub>yyy</sub><test:ws xmlns:pkg="http://expath.org/ns/pkg"> </test:ws><span>zzz</span></p>
+            <p xml:space="preserve">xxx <sup>yyy</sup><test:ws xmlns:pkg="http://expath.org/ns/pkg"> </test:ws><span>zzz</span></p>
+            <p xml:space="preserve">xxx <sup>yyy</sup><test:ws xmlns:pkg="http://expath.org/ns/pkg"> </test:ws><span>zzz</span></p>
+            <p xml:space="preserve">xxx <sub>yyy</sub><test:ws xmlns:pkg="http://expath.org/ns/pkg"> </test:ws><span>zzz</span></p>
+            <p xml:space="preserve">xxx <sub>yyy</sub><test:ws xmlns:pkg="http://expath.org/ns/pkg"> </test:ws><span>zzz</span></p>
+            <p xml:space="preserve">xxx <span><sup>yyy</sup><test:ws xmlns:pkg="http://expath.org/ns/pkg"> </test:ws></span><span>zzz</span></p>
+            <p xml:space="preserve">xxx <span><sup>yyy</sup><test:ws xmlns:pkg="http://expath.org/ns/pkg"> </test:ws></span><span>zzz</span></p>
+            <p xml:space="preserve">xxx <span><sub>yyy</sub><test:ws xmlns:pkg="http://expath.org/ns/pkg"> </test:ws></span><span>zzz</span></p>
+            <p xml:space="preserve">xxx <span><sub>yyy</sub><test:ws xmlns:pkg="http://expath.org/ns/pkg"> </test:ws></span><span>zzz</span></p>
+            <p xml:space="preserve">xxx <span><sup>yyy</sup></span><test:ws xmlns:pkg="http://expath.org/ns/pkg"> </test:ws><span>zzz</span></p>
+            <p xml:space="preserve">xxx <span><sup>yyy</sup><test:ws xmlns:pkg="http://expath.org/ns/pkg"> </test:ws></span><test:ws xmlns:pkg="http://expath.org/ns/pkg"> </test:ws><span>zzz</span></p>
+            <p xml:space="preserve">xxx <span><sub>yyy</sub></span><test:ws xmlns:pkg="http://expath.org/ns/pkg"> </test:ws><span>zzz</span></p>
+            <p xml:space="preserve">xxx <span><sub>yyy</sub><test:ws xmlns:pkg="http://expath.org/ns/pkg"> </test:ws></span><test:ws xmlns:pkg="http://expath.org/ns/pkg"> </test:ws><span>zzz</span></p>
+         </div>
+      </x:result>
+      <x:test successful="true">
+         <x:label>the result should be as expected</x:label>
+         <x:expect>
+            <div>
+               <p xml:space="preserve">xxx <sup>yyy</sup> zzz</p>
+               <p xml:space="preserve">xxx<sup>yyy</sup> zzz</p>
+               <p xml:space="preserve">xxx <sup>yyy</sup> zzz</p>
+               <p xml:space="preserve">xxx<sup>yyy</sup> zzz</p>
+               <p xml:space="preserve">xxx <sub>yyy</sub> zzz</p>
+               <p xml:space="preserve">xxx<sub>yyy</sub> zzz</p>
+               <p xml:space="preserve">xxx <sub>yyy</sub> zzz</p>
+               <p xml:space="preserve">xxx<sub>yyy</sub> zzz</p>
+               <p xml:space="preserve">xxx <sup>yyy</sup><span> zzz</span></p>
+               <p xml:space="preserve">xxx <sup>yyy</sup><test:ws xmlns:pkg="http://expath.org/ns/pkg"> </test:ws><span>zzz</span></p>
+               <p xml:space="preserve">xxx <sub>yyy</sub><span> zzz</span></p>
+               <p xml:space="preserve">xxx <sub>yyy</sub><test:ws xmlns:pkg="http://expath.org/ns/pkg"> </test:ws><span>zzz</span></p>
+               <p xml:space="preserve">xxx <sup>yyy</sup><test:ws xmlns:pkg="http://expath.org/ns/pkg"> </test:ws><span>zzz</span></p>
+               <p xml:space="preserve">xxx <sup>yyy</sup><test:ws xmlns:pkg="http://expath.org/ns/pkg"> </test:ws><span>zzz</span></p>
+               <p xml:space="preserve">xxx <sub>yyy</sub><test:ws xmlns:pkg="http://expath.org/ns/pkg"> </test:ws><span>zzz</span></p>
+               <p xml:space="preserve">xxx <sub>yyy</sub><test:ws xmlns:pkg="http://expath.org/ns/pkg"> </test:ws><span>zzz</span></p>
+               <p xml:space="preserve">xxx <span><sup>yyy</sup><test:ws xmlns:pkg="http://expath.org/ns/pkg"> </test:ws></span><span>zzz</span></p>
+               <p xml:space="preserve">xxx <span><sup>yyy</sup><test:ws xmlns:pkg="http://expath.org/ns/pkg"> </test:ws></span><span>zzz</span></p>
+               <p xml:space="preserve">xxx <span><sub>yyy</sub><test:ws xmlns:pkg="http://expath.org/ns/pkg"> </test:ws></span><span>zzz</span></p>
+               <p xml:space="preserve">xxx <span><sub>yyy</sub><test:ws xmlns:pkg="http://expath.org/ns/pkg"> </test:ws></span><span>zzz</span></p>
+               <p xml:space="preserve">xxx <span><sup>yyy</sup></span><test:ws xmlns:pkg="http://expath.org/ns/pkg"> </test:ws><span>zzz</span></p>
+               <p xml:space="preserve">xxx <span><sup>yyy</sup><test:ws xmlns:pkg="http://expath.org/ns/pkg"> </test:ws></span><test:ws xmlns:pkg="http://expath.org/ns/pkg"> </test:ws><span>zzz</span></p>
+               <p xml:space="preserve">xxx <span><sub>yyy</sub></span><test:ws xmlns:pkg="http://expath.org/ns/pkg"> </test:ws><span>zzz</span></p>
+               <p xml:space="preserve">xxx <span><sub>yyy</sub><test:ws xmlns:pkg="http://expath.org/ns/pkg"> </test:ws></span><test:ws xmlns:pkg="http://expath.org/ns/pkg"> </test:ws><span>zzz</span></p>
+            </div>
+         </x:expect>
+      </x:test>
+   </x:scenario>
+</x:report>
