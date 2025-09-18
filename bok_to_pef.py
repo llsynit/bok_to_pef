@@ -43,7 +43,6 @@ def save_artifact(pip_output, job_status, message, production_number, uid, job_i
     Save artifacts to the artifacts folder
     """
 
-    print("Saving artifacts ****** ---> " + job_status)
     os.makedirs(artifacts_folder, exist_ok=True)
     job_folder = os.path.join(artifacts_folder, job_id)
     os.makedirs(job_folder, exist_ok=True)
@@ -51,29 +50,21 @@ def save_artifact(pip_output, job_status, message, production_number, uid, job_i
     combined_log = pip_log or "No pipeline log available."
     logs_txt_path = os.path.join(job_folder, "logs.txt")
     dagsrapport = f"{datetime.now().strftime('%Y-%m-%d')}-{uid}.txt"
-    # check if logs_txt_path and dagsrapport already exist, and if so, rename them with a timestamp
-    if os.path.exists(logs_txt_path):
-        print("logs exist ******")
-    if os.path.exists(dagsrapport):
-        print("dagsrapport exist ******")
 
     # save epub_as_folder
     # if epub_as_folder and os.path.exists(epub_as_folder):
     #    shutil.copytree(epub_as_folder, os.path.join(
     #        job_folder, f"{production_number}_folder"))
 
-    if job_status in ("DONE", "SUCCESS") and pip_output is not None and os.path.exists(pip_output):
-        print("Saving pip_output ******")
+    if job_status in ("DONE", "SUCCESS"):
         logger.info(f"Saving artifacts to {job_folder}")
         # check if pip_output is a zip file and extract it else it is just a folder copy thte content
         if zipfile.is_zipfile(pip_output):
-            print("pip_output is a zip file ******")
             logger.info("pip_output is a zip file")
             with zipfile.ZipFile(pip_output, 'r') as zip_ref:
                 zip_ref.extractall(job_folder)
         else:
             logger.info("pip_output is a folder")
-            print("pip_output is a folder ******")
             # copy the content of the folder to job_folder
             for item in os.listdir(pip_output):
                 s = os.path.join(pip_output, item)
@@ -85,7 +76,6 @@ def save_artifact(pip_output, job_status, message, production_number, uid, job_i
 
         # clean up pip_output folder
         shutil.rmtree(pip_output, ignore_errors=True)
-    print("Finished saving artifacts ******")
     status = ""
     if job_status == "DONE" or job_status == "SUCCESS":
         status = "success"

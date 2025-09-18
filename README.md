@@ -9,6 +9,7 @@ Konverterer XHTML fil til PEF
 ```
 artifacts/
 bok_to_pef/
+  ├─ xslt/
   ├─ app.py               # FastAPI-wrapper
   ├─ bok_to_pef.py   # Din domene-modul (importeres av app.py)
   ├─ requirements.txt     # Python-avhengigheter
@@ -25,7 +26,7 @@ bok_to_pef/
 docker build -t bok_to_pef:dev ./modules/utils/bok_to_pef
 
 # Kjør container
-docker run --rm -p 7003:7003   -e MODULE_NAME=bok_to_pef   -v "$(pwd)/volumes:/data"   bok_to_pef:dev
+docker run --rm -p 7013:7013   -e MODULE_NAME=bok_to_pef   -v "$(pwd)/volumes:/data"   bok_to_pef:dev
 ```
 
 ### 2) docker compose (eksempel)
@@ -36,7 +37,7 @@ Legg til en tjeneste i `docker-compose.yml`:
 bok_to_pef:
   image:llsynit/bok_to_pef
   ports:
-    - "7003:7003"
+    - "7013:7013"
 
 ```
 
@@ -48,7 +49,7 @@ docker compose up -d --build bok_to_pef
 
 ## API
 
-Base-URL: `http://localhost:7003`
+Base-URL: `http://localhost:7013`
 
 ### `GET /health`
 
@@ -62,7 +63,7 @@ Helsetest.
   "module": "bok_to_pef",
   "production_number": "string",
   "filename": "result.zip",
-  "download_url": "http://127.0.0.1:7003/download/xx",
+  "download_url": "http://127.0.0.1:7013/download/xx",
   "duration_ms": 11
 }
 ```
@@ -75,7 +76,7 @@ Helsetest.
   "module": "bok_to_pef",
   "production_number": "string",
   "filename": "result.zip",
-  "download_url": "http://127.0.0.1:7003/download/xx",
+  "download_url": "http://127.0.0.1:7013/download/xx",
   "duration_ms": 11
 }
 ```
@@ -94,8 +95,6 @@ Kjører innsetting av metadata.
 ```
 
 - `input` (påkrevd): sti til XHTML (relativ til `/data` eller absolutt).
-- `production_number` (påkrevd): brukes av `insert_metadata.py` for å hente/bygge metadata.
-- `output` (valgfri): sti for resultatfil. Uten denne overskrives input.
 
 **Respons (200)**
 
@@ -131,7 +130,7 @@ HTML
 
 # Kjør
 curl -X 'POST' \
-  'http://127.0.0.1:7003/run' \
+  'http://127.0.0.1:7013/run' \
   -H 'accept: application/json' \
   -H 'Content-Type: multipart/form-data' \
   -F 'production_number=string' \

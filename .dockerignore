@@ -1,0 +1,15 @@
+git
+.gitignore
+
+.dockerignore
+Dockerfile
+
+/artifacts
+__pycache__
+
+.env
+.env_example
+venv
+.DS_Store
+*.log
+.

@@ -166,9 +166,9 @@ async def run(
     braille_arguments_from_queue: Optional[str] = Form(default="{}"),
 ):
     """
-    Insert metadata into XHTML and package.opf from NBL api
+    Input: XHTML file (UploadFile)
+    Returns a pef file and logs.
     Manual test endpoint — not used by RabbitMQ flow.
-    Returns a xhtml file, package opf and logs.
     """
     t0 = time.time()
     # Get original filename
