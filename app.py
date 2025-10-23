@@ -19,13 +19,17 @@ import httpx
 from fastapi import FastAPI, UploadFile, File, Form, Request, HTTPException
 from fastapi.responses import StreamingResponse, JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
-
-
 from aiormq.exceptions import AMQPConnectionError
-
+from dotenv import load_dotenv
 from bok_to_pef import bok_to_pef
 from utils import summarize_artifacts, cleanup_artifacts_once
-from dotenv import load_dotenv
+from config import (
+    MODULE_NAME, PORT,
+    RABBITMQ_URL, WORK_EXCHANGE, RESULTS_EXCHANGE,
+    WORK_ROUTING_KEY, WORK_QUEUE_NAME,
+    WORKER_BASE_URL,
+    ARTIFACTS_ROOT, ARTIFACTS_RETENTION_HOURS, ARTIFACTS_CLEAN_INTERVAL_SEC,
+)
 
 load_dotenv()
 
@@ -45,44 +49,7 @@ logging.getLogger("aio_pika").setLevel(logging.WARNING)
 logging.getLogger("aiormq").setLevel(logging.WARNING)
 
 
-# =============================================================================
-# Config (env) — no Redis anywhere, pure RabbitMQ
-# =============================================================================
-
-MODULE_NAME = os.getenv("MODULE_NAME", "nordic_to_bok")
-PORT = int(os.getenv("PORT", "7002"))
-uid = "nordic-epub-to-nlbpub"
-
-logger.info(f"Starting {MODULE_NAME} on port {PORT}.....")
-
-# RabbitMQ
-# e.g. amqp://admin:admin@rabbitmq:5672/%2F (docker) or ...@localhost...
-RABBITMQ_URL = os.getenv("RABBITMQ_URL")
-if not RABBITMQ_URL:
-    raise RuntimeError("RABBITMQ_URL is required")
-
-WORK_EXCHANGE = os.getenv("WORK_EXCHANGE", "work.ex")            # direct
-RESULTS_EXCHANGE = os.getenv("RESULTS_EXCHANGE", "results.ex")   # topic
-WORK_ROUTING_KEY = os.getenv(
-    "WORK_ROUTING_KEY", "nordic_to_bok")     # stage name
-WORK_QUEUE_NAME = os.getenv(
-    "WORK_QUEUE_NAME", "nordic_to_bok.q")     # durable queue
-
-# Artifacts are EPHEMERAL here — the controller should fetch and persist them.
-# ARTIFACTS_ROOT = Path(os.getenv("ARTIFACTS_ROOT", "/tmp/artifacts")).resolve()
-# ARTIFACTS_ROOT.mkdir(parents=True, exist_ok=True)
-WORKER_BASE_URL = os.getenv("WORKER_BASE_URL", f"http://{MODULE_NAME}:{PORT}")
-
-
-BASE_DIR = Path(__file__).parent
-ARTIFACTS_ROOT = (BASE_DIR / "artifacts").resolve()
-ARTIFACTS_ROOT.mkdir(parents=True, exist_ok=True)
-
-ARTIFACTS_RETENTION_HOURS = int(
-    os.getenv("ARTIFACTS_RETENTION_HOURS", "24"))  # default 24h
-ARTIFACTS_CLEAN_INTERVAL_SEC = int(
-    os.getenv("ARTIFACTS_CLEAN_INTERVAL_SEC", "900"))  # default 15 min
-
+uid = "bok_to_pef"
 
 # =============================================================================
 # FastAPI
@@ -164,6 +131,7 @@ async def run(
     request: Request,
     xhtml: UploadFile = File(...),
     braille_arguments_from_queue: Optional[str] = Form(default="{}"),
+    save_prepared_xhtml: Optional[bool] = Form(default=True),
 ):
     """
     Input: XHTML file (UploadFile)
@@ -186,7 +154,7 @@ async def run(
 
     try:
         status = bok_to_pef(
-            xhtml_path, braille_arguments_from_queue, job_id, production_number,
+            xhtml_path, braille_arguments_from_queue, job_id, production_number,save_prepared_xhtml=save_prepared_xhtml,
 
         )
     finally:
@@ -267,6 +235,7 @@ async def _handle_work_message(m: aio_pika.IncomingMessage):
         inputs = data.get("inputs") or {}
         corr_id = data.get("correlation_id") or m.correlation_id
         production_number = str(data.get("production_number") or "")
+        save_prepared_xhtml = bool(data.get("save_prepared_xhtml", False))  #  optional flag, defaults to False
 
         xhtml_uri = inputs.get("xhtml_uri")
         opf_uri = inputs.get("opf_uri")
@@ -288,7 +257,7 @@ async def _handle_work_message(m: aio_pika.IncomingMessage):
 
         # 2) Run bok_to_pef
         try:
-            status = bok_to_pef(production_number, job_id, str(tmp_xhtml))
+            status = bok_to_pef(production_number, job_id, str(tmp_xhtml),save_prepared_xhtml=save_prepared_xhtml)
         except Exception as e:
             # crash → publish fail
             artifacts = {"error": f"bok_to_pef crashed: {e}"}

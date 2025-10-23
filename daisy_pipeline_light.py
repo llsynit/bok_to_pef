@@ -126,7 +126,15 @@ class RemoteDaisyPipelineJob:
     def _script_available(self, engine, pipeline_version, script_version):
         scripts = None
         try:
+            url = self._url(engine, "/alive")
+            print("URL:", url)
             alive = requests.get(self._url(engine, "/alive"))
+            print("Status:", alive.status_code)
+            print("Text:", alive.text)  
+            print("alive--- test")
+            print(alive)
+            print("test ---- *********" )
+            print(engine)
             if not alive.ok:
                 logger.warning(
                     f"Engine {engine['endpoint']} is not alive or not reachable.")
@@ -317,7 +325,8 @@ class RemoteDaisyPipelineJob:
             sig = base64.b64encode(h.digest()).decode().replace("+", "%2B")
             # In some implementations you might append sig to the URL
             # base += f"&sign={sig}"  # Uncomment if required by server
-
+        print("created url::_____::::")
+        print(base)
         return base
 
     def encode_url(self, engine, endpoint, parameters):

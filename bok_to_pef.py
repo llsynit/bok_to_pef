@@ -10,7 +10,8 @@ import logging
 import time
 from datetime import datetime
 import json
-from daisy_pipeline_light import RemoteDaisyPipelineJob
+#from daisy_pipeline_light import RemoteDaisyPipelineJob
+from daisy_pipeline import DaisyPipelineJob
 from prepare_for_pef import prepare_for_pef
 
 PROJECT_ROOT = Path(__file__).resolve().parent
@@ -38,7 +39,7 @@ class InMemoryLogHandler(logging.Handler):
         return self.log_stream.getvalue()
 
 
-def save_artifact(pip_output, job_status, message, production_number, uid, job_id, handler, pip_log=None,  artifacts_folder="artifacts"):
+def save_artifact(pip_output, job_status, message, production_number, uid, job_id, handler, pip_log=None,  artifacts_folder="artifacts", prepared_xhtml_file: str | Path | None = None):
     """
     Save artifacts to the artifacts folder
     """
@@ -55,6 +56,13 @@ def save_artifact(pip_output, job_status, message, production_number, uid, job_i
     # if epub_as_folder and os.path.exists(epub_as_folder):
     #    shutil.copytree(epub_as_folder, os.path.join(
     #        job_folder, f"{production_number}_folder"))
+    if prepared_xhtml_file and Path(prepared_xhtml_file).exists():
+        dest_prepared = os.path.join(job_folder, f"{production_number}_prepared.html")
+        shutil.copy2(prepared_xhtml_file, dest_prepared)
+        logger.info(f"[save_artifact] Saved prepared file: {dest_prepared}")
+    
+    logger.info(f"[save_artifact] prepared_file not found: {prepared_xhtml_file}")
+
 
     if job_status in ("DONE", "SUCCESS"):
         logger.info(f"Saving artifacts to {job_folder}")
@@ -67,6 +75,8 @@ def save_artifact(pip_output, job_status, message, production_number, uid, job_i
             logger.info("pip_output is a folder")
             # copy the content of the folder to job_folder
             for item in os.listdir(pip_output):
+                print("items in output")
+                print(item)
                 s = os.path.join(pip_output, item)
                 d = os.path.join(job_folder, item)
                 if os.path.isdir(s):
@@ -102,9 +112,11 @@ def save_artifact(pip_output, job_status, message, production_number, uid, job_i
 
 
 def bok_to_pef(html, braille_arguments_from_queue, job_id, production_number,
-               log_handler=None):
+               log_handler=None, **kwargs,):
+    save_prepared_xhtml = kwargs.pop("save_prepared_xhtml", True)
     pip_output = None
     pip_log = None
+    prepared_xhtml_file = None
     handler = InMemoryLogHandler()
     handler.setFormatter(logging.Formatter(
         "%(asctime)s - %(levelname)s - %(message)s"))
@@ -124,7 +136,8 @@ def bok_to_pef(html, braille_arguments_from_queue, job_id, production_number,
             uid=uid,
             production_number=production_number,
             handler=handler,
-            message=message or ""
+            message=message or "",
+            prepared_xhtml_file = prepared_xhtml_file,
         )
         return {"status": status, "message": message}
 
@@ -139,7 +152,7 @@ def bok_to_pef(html, braille_arguments_from_queue, job_id, production_number,
     if hasattr(html, "file"):  # looks like UploadFile / file-like
         # If you still want to support UploadFile here:
         tmp_dir = Path(tempfile.mkdtemp())
-        name = getattr(html, "filename", "input.xhtml")
+        name = getattr(html, "filename", "input.html")
         html_path = tmp_dir / name
         with open(html_path, "wb") as f:
             f.write(html.file.read())
@@ -154,17 +167,18 @@ def bok_to_pef(html, braille_arguments_from_queue, job_id, production_number,
     if not status.get("success"):
         return _pre_fail(f"prepare_for_pef failed: {status.get('errors')}")
 
-    prepared_html = Path(status["xhtml_path"])
-
-    print(f"Prepared HTML located at::::: {prepared_html}")
+    prepared_html = Path(status["html_path"])
+    if save_prepared_xhtml:
+        prepared_xhtml_file = prepared_html
+    logger.info(f"Prepared HTML located at::::: {prepared_html}")
 
     # Stage a working copy (optional, but matches your original intent)
     temp_dir = Path(tempfile.mkdtemp())
     target_name = prepared_html.name
     html_path_context = temp_dir / target_name
     shutil.copyfile(prepared_html, html_path_context)
-    file_name = f"{production_number}.xhtml"
-    print(f"Prepared HTML copied to working dir::::: {prepared_html.name}")
+    file_name = f"{production_number}.html"
+    logger.info(f"Prepared HTML copied to working dir::::: {prepared_html.name}")
     try:
         args_from_queue = json.loads(braille_arguments_from_queue)
     except json.JSONDecodeError:
@@ -178,6 +192,7 @@ def bok_to_pef(html, braille_arguments_from_queue, job_id, production_number,
         "include-production-notes": 'true',
         "hyphenation": 'none',
         "include-preview": 'true',
+        #"include-pdf": 'true',
         "hyphenation-at-page-breaks": 'except-at-volume-breaks',
         "allow-volume-break-inside-leaf-section-factor": '10',
         "prefer-volume-break-before-higher-level-factor": '1',
@@ -205,60 +220,65 @@ def bok_to_pef(html, braille_arguments_from_queue, job_id, production_number,
         "braille.scss": os.path.join(XSLT_DIR, "braille.scss")
     }
 
-    versions = [
+    pipeline_and_script_version = [
+        #("1.15.2", "8.2.1"),
         ("1.14.17-p1", "6.2.0"),
-        ("1.14.17-p2-SNAPSHOT", "6.2.0"),
+        #("1.14.17-p2-SNAPSHOT", "6.2.0"),
+        #("1.14.14", "6.1.0"),
+        #("1.14.14", "6.1.0"),
     ]
 
-    init_args = {
-        "script_id": "html-to-pef",
-        "arguments": arguments,
-        "context": context,
-        "versions": versions,
-        "log_handler": log_handler,
-    }
+    script_id = "html-to-pef"
+    braille_arguments = arguments
+    with DaisyPipelineJob(script_id,
+                              braille_arguments,
+                              pipeline_and_script_version=pipeline_and_script_version,
+                              context=context
+                              ) as dp2_job:
+            found_pipeline_version = dp2_job.found_pipeline_version
+            found_script_version = dp2_job.found_script_version
 
-    dp2_job = RemoteDaisyPipelineJob(**init_args)
-    result = dp2_job.run()
-    pip_job_id = result.get("job_id")
-    status = "RUNNING"
-    timeout = time.time() + 600  # 10 min
+            # get conversion report
+            if os.path.isdir(os.path.join(dp2_job.dir_output, "preview-output-dir")):
+                #save pef-priveiw to utgave-ut PEF instead of report.
+                #Filesystem.copy(self.utils.report,
+                #                os.path.join(dp2_job.dir_output, "preview-output-dir"),
+                #                os.path.join(self.utils.report.reportDir(), "preview"))
+                #self.utils.report.attachment(None,
+                #                             os.path.join(self.utils.report.reportDir(), "preview" + "/" + identifier + ".pef.html"),
+                #                             "SUCCESS" if dp2_job.status == "SUCCESS" else "ERROR")
+                logger.info("Saving files")
+           
+            if dp2_job.status != "SUCCESS":
+                logger.info("Klarte ikke å konvertere boken")
+                message=  production_number + " feilet 😭👎" 
+                pip_log = dp2_job.job_log
+                return _finish(False, "FAIL", message)
 
-    while status in ("RUNNING", "IDLE") and time.time() < timeout:
-        status = dp2_job.get_status(pip_job_id)
+            dp2_pef_dir = os.path.join(dp2_job.dir_output, "pef-output-dir")
+            dp2_new_pef_dir = os.path.join(dp2_job.dir_output, "output-dir")
+            #for pip version 1.14.15 and newer
+            dp2_result_dir = os.path.join(dp2_job.dir_output, "result")
+            if not os.path.exists(dp2_pef_dir) and os.path.exists(dp2_new_pef_dir):
+                dp2_pef_dir = dp2_new_pef_dir
 
-        logger.info(
-            f"Job {job_id} with pip job_id: {pip_job_id} status: {status}")
-        if status == "DONE" or status == "SUCCESS":
-            logger.info(
-                f"Job {job_id} pip job_id: {job_id} completed successfully.")
+            if not os.path.exists(dp2_pef_dir) and not os.path.exists(dp2_new_pef_dir):
+                dp2_pef_dir = dp2_result_dir
 
-            # job.download_all(job_id)
-            pip_output = dp2_job.download_all(pip_job_id)
-            if not pip_output:
-                logger.error(
-                    f"Job {job_id} pip job_id: {pip_job_id} failed to download report.")
+            if not os.path.isdir(dp2_pef_dir):
+                logger.info("Finner ikke den konverterte boken.")
+                message=  production_number + " feilet 😭👎" 
                 return False
-            pip_log = dp2_job.get_log()
-            if not pip_log:
-                logger.error(
-                    f"Job {job_id} pip job_id: {pip_job_id} failed to get log.")
-                # return False
-            break
+            if os.path.isdir(os.path.join(dp2_job.dir_output, "preview-output-dir")):
+                logger.info("Preview files exist - copy to output")
 
-        if status == "ERROR":
-            logger.error("Klarte ikke å validere boken")
-            logger.error(f"{production_number} feilet 😭👎")
-            logger.error(
-                f"Job with pip job_id: {pip_job_id} failed with error.")
+            pip_output = dp2_pef_dir
+            
+            message = production_number + " ble konvertert 👍😄"
+            pip_log = dp2_job.job_log
+            return _finish(True, "DONE", message)
 
-            pip_log = dp2_job.get_log() or ""
-            return _finish(False, status, f"{production_number} html to pef failed.")
-        if status not in ("IDLE", "RUNNING"):
-            pip_log = dp2_job.get_log() or ""
-            return _finish(False, status, "PIP: unexpected status.")
 
-        time.sleep(5)
-    message = production_number + " ble konvertert 👍😄"
+    
 
-    return _finish(True, "DONE", message)
+    

@@ -188,3 +188,4 @@ def cleanup_artifacts_once(ARTIFACTS_DIR, ARTIFACTS_RETENTION_HOURS, logger) -> 
                 "Artifacts cleanup: failed to delete %s: %r", entry, e)
 
     return stats
+

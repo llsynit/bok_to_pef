@@ -216,7 +216,7 @@ soup_or_str = update_html_head_with_marc(input_path: str, production_number: str
 cd insert_metadata
 python -m venv .venv && . .venv/bin/activate
 pip install -r requirements.txt
-uvicorn app:app --host 0.0.0.0 --port 9013 --reload
+uvicorn app:app --host 0.0.0.0 --port 39013 --reload
 ```
 
 ---
