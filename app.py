@@ -217,47 +217,40 @@ def health():
 
 
 async def _handle_work_message(m: aio_pika.IncomingMessage):
-    """
-    Expected message body (JSON) from controller:
-    {
-      "job_id": "...",
-      "production_number": "...",
-      "stage": "insert_metadata",
-      "inputs": { "xhtml_uri": "http://controller:8000/downloads/<prod>/<file>.xhtml", "opf_uri": "http://controller:8000/downloads/<prod>/<file>.opf" },
-      "correlation_id": "job::<id>::insert_metadata::1",
-      ...
-    }
-    """
     async with m.process():
         data = __import__("json").loads(m.body.decode("utf-8"))
         job_id = data.get("job_id")
-        stage = data.get("stage") or "nordic_to_bok"
+        stage = data.get("stage") or "bok_to_pef"
         inputs = data.get("inputs") or {}
         corr_id = data.get("correlation_id") or m.correlation_id
         production_number = str(data.get("production_number") or "")
         save_prepared_xhtml = bool(data.get("save_prepared_xhtml", False))  #  optional flag, defaults to False
-
+        braille_arguments_from_queue = str(data.get("braille_arguments_from_queue") or "{}")
         xhtml_uri = inputs.get("xhtml_uri")
-        opf_uri = inputs.get("opf_uri")
 
-        if not (job_id and xhtml_uri and opf_uri and production_number):
+       
+        #opf_uri = inputs.get("opf_uri")
+
+        if not (job_id and xhtml_uri and production_number):
             await _publish_result(stage, job_id or "?", "fail",
-                                  {"error": "missing job_id/xhtml_uri/opf_uri/production_number"}, corr_id)
+                                  {"error": "missing job_id/xhtml_uri/production_number"}, corr_id)
             return
 
         # Workspace (EPHEMERAL)
         job_dir = ARTIFACTS_ROOT / job_id
-        # job_dir.mkdir(parents=True, exist_ok=True)
+        job_dir.mkdir(parents=True, exist_ok=True)
         tmp_xhtml = job_dir / "input.xhtml"
-        tmp_opf = job_dir / "package.opf"
+        # tmp_opf = job_dir / "package.opf"
 
         # 1) Fetch xhtml
         await _http_download_to(tmp_xhtml, xhtml_uri)
-        await _http_download_to(tmp_opf, opf_uri)
+        #await _http_download_to(tmp_opf, opf_uri)
 
         # 2) Run bok_to_pef
         try:
-            status = bok_to_pef(production_number, job_id, str(tmp_xhtml),save_prepared_xhtml=save_prepared_xhtml)
+            #status = bok_to_pef(production_number, job_id, str(tmp_xhtml),save_prepared_xhtml=save_prepared_xhtml)
+            status = bok_to_pef(tmp_xhtml, braille_arguments_from_queue, job_id, production_number,  save_prepared_xhtml=save_prepared_xhtml)
+            
         except Exception as e:
             # crash → publish fail
             artifacts = {"error": f"bok_to_pef crashed: {e}"}
@@ -267,11 +260,7 @@ async def _handle_work_message(m: aio_pika.IncomingMessage):
             except Exception:
                 pass
             return
-        finally:
-            try:
-                tmp_opf.unlink(missing_ok=True)
-            except Exception:
-                pass
+
 
         if not os.path.isdir(job_dir):
             await _publish_result(stage, job_id, "fail",

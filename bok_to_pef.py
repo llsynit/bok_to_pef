@@ -221,8 +221,8 @@ def bok_to_pef(html, braille_arguments_from_queue, job_id, production_number,
     }
 
     pipeline_and_script_version = [
-        #("1.15.2", "8.2.1"),
-        ("1.14.17-p1", "6.2.0"),
+        ("1.15.2", "8.2.1"),
+        #("1.14.17-p1", "6.2.0"),
         #("1.14.17-p2-SNAPSHOT", "6.2.0"),
         #("1.14.14", "6.1.0"),
         #("1.14.14", "6.1.0"),

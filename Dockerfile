@@ -8,6 +8,20 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR ${APP_HOME}
 
+# --- Java (for Saxon) ---
+# Use OpenJDK 21 on Debian trixie
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+    openjdk-21-jre-headless \
+    ca-certificates curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# (optional) expose JAVA_HOME; path is correct on Debian for JDK/JRE 21
+ENV JAVA_HOME=/usr/lib/jvm/java-21-openjdk-arm64
+# If you also build amd64, JAVA_HOME is /usr/lib/jvm/java-21-openjdk-amd64 there.
+# You can skip JAVA_HOME entirely if your code only shells `java`.
+ENV PATH="${JAVA_HOME}/bin:${PATH}"
+
 # Installer Python-avhengigheter
 COPY requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel \
