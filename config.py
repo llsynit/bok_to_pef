@@ -11,7 +11,7 @@ load_dotenv(find_dotenv(), override=False)
 # =============================================================================
 
 MODULE_NAME = os.getenv("MODULE_NAME_BOK_TO_PEF", "bok_to_pef")
-PORT = int(os.getenv("PORT_BOK_TO_PEF", "7013"))
+PORT = int(os.getenv("PORT_BOK_TO_PEF", "39013"))
 
 print(f"Starting {MODULE_NAME} on port {PORT}.....")
 
