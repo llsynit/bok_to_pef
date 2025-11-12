@@ -98,7 +98,9 @@ async def _http_download_to(dst: Path, url: str):
 
 
 def _art_uri(job_id: str,  name: str) -> str:
-    return f"{WORKER_BASE_URL}/artifacts/{job_id}/{name}"
+    uri = f"{WORKER_BASE_URL}/artifacts/{job_id}/{name}"    
+    logger.info(f"Generated artifact URI for job_id={job_id}, name={name}: {uri}")
+    return uri
 
 
 
@@ -344,8 +346,14 @@ async def _handle_work_message(m: aio_pika.IncomingMessage):
                     continue
                 
                 # Add to artifacts
-                rel_path = str(path.relative_to(job_dir))
-                artifacts[rel_path] = _art_uri(job_id, rel_path)
+                #rel_path = str(path.relative_to(job_dir))
+                #artifacts[rel_path] = _art_uri(job_id, rel_path)
+               
+                artifact_name = str(path.relative_to(job_dir))
+                artifact_url = _art_uri(job_id, str(path.relative_to(job_dir)))
+                #artifacts[str(path.relative_to(job_dir))] = _art_uri(job_id, str(path.relative_to(job_dir)))
+                logger.info(f"[{job_id}] Adding artifact: {artifact_name} -> {artifact_url}")
+                artifacts[artifact_name] = artifact_url
 
             # Determine status
             if isinstance(status, dict):
