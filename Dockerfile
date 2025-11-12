@@ -3,7 +3,7 @@ FROM python:3.12-slim
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     MODULE_NAME=bok_to_pef \
-    PORT=7013 \
+    PORT=39013 \
     APP_HOME=/app
 
 WORKDIR ${APP_HOME}
@@ -36,7 +36,7 @@ COPY --chown=appuser:appuser . /app
 
 USER appuser
 
-EXPOSE 7013
-HEALTHCHECK --interval=20s --timeout=3s --retries=5 CMD python -c "import socket; s=socket.create_connection(('127.0.0.1', 7013), 2); s.close()"
+EXPOSE 39013
+HEALTHCHECK --interval=20s --timeout=3s --retries=5 CMD python -c "import socket; s=socket.create_connection(('127.0.0.1', 39013), 2); s.close()"
 
 CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "39013"]
