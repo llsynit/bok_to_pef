@@ -79,15 +79,14 @@ class Config:
         os.getenv("ARTIFACTS_CLEAN_INTERVAL_SEC", "900"))  # default 15 min
 
 
-    PIP_PEF_STABLE = ast.literal_eval(os.getenv("PIP_PEF_STABLE", "('1.11.1-SNAPSHOT', '1.3.0')"))
-    PIP_PEF_TEST = ast.literal_eval(os.getenv("PIP_PEF_TEST", "('1.11.1-SNAPSHOT', '1.3.0')"))
-    PIP_PEF_TEST2 = ast.literal_eval(os.getenv("PIP_PEF_TEST2", "('1.14.3', '1.5.2-SNAPSHOT')"))
+
+
+    PIP_PEF_STABLE = ast.literal_eval(os.getenv("PIP_PEF_STABLE", "(('1.14.17-p1', '6.2.0'),)"))
+    PIP_PEF_TEST = ast.literal_eval(os.getenv("PIP_PEF_TEST", "(('1.15.4-SNAPSHOT', '9.0.0'), ('1.15.2', '8.2.1'))"))
+
 
 
     logger.info (".env Daisy pipeline html_to_pef versions:")
     logger.info (f"PIP_PEF_STABLE: {PIP_PEF_STABLE}")
     logger.info (f"PIP_PEF_TEST: {PIP_PEF_TEST}")
-    logger.info (f"PIP_PEF_TEST2: {PIP_PEF_TEST2}")
-
-
     logger.info("Configuration initialized.")
