@@ -6,7 +6,7 @@ import uuid
 import tempfile
 import io
 import logging
-from contextlib import suppress
+from contextlib import suppress, asynccontextmanager
 import asyncio
 import sys
 from pathlib import Path
@@ -20,69 +20,93 @@ from fastapi import FastAPI, UploadFile, File, Form, Request, HTTPException
 from fastapi.responses import StreamingResponse, JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from aiormq.exceptions import ChannelInvalidStateError, AMQPConnectionError
-from dotenv import load_dotenv
 from bok_to_pef import bok_to_pef
 from utils import summarize_artifacts, cleanup_artifacts_once
-from config import (
-    MODULE_NAME, PORT,
-    RABBITMQ_URL, WORK_EXCHANGE, RESULTS_EXCHANGE,
-    WORK_ROUTING_KEY, WORK_QUEUE_NAME,
-    WORKER_BASE_URL,
-    ARTIFACTS_ROOT, ARTIFACTS_RETENTION_HOURS, ARTIFACTS_CLEAN_INTERVAL_SEC,
-)
-
-load_dotenv()
-
-# -----------------------------------------------------------------------------
-# Logger
-# -----------------------------------------------------------------------------
-
-
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(message)s",
-    handlers=[logging.StreamHandler(sys.stdout)]
-)
-logger = logging.getLogger(__name__)
+from config import Config, logger
 
 logging.getLogger("aio_pika").setLevel(logging.WARNING)
 logging.getLogger("aiormq").setLevel(logging.WARNING)
 
-
 uid = "bok_to_pef"
-
-# =============================================================================
-# FastAPI
-# =============================================================================
-
-app = FastAPI(title=MODULE_NAME, version="2.0.0", debug=True)
 DOWNLOADS: Dict[str, bytes] = {}
 
+logger.info(f"Starting {Config.MODULE_NAME} on port {Config.PORT}.....")
 
-app.state.amqp_enabled = False
-app.state.amqp_conn = None
-app.state.amqp_ch = None
-app.state._amqp_reconnector_task = None  # background task handle
-RECONNECT_DELAY_SECONDS = 30
+# AMQP CALLBACK FUNCTIONS (used by _setup_amqp)
 
-# Track current job to avoid deleting it while processing (optional but recommended)
-app.state.current_job = getattr(app.state, "current_job", {
-                                "running": False, "production_number": None, "status": None, "job_id": None})
+def _on_reconnect(connection):
+    """Called when connection is re-established"""
+    logger.info(f"[{Config.MODULE_NAME}] AMQP connection restored!")
+    app.state.amqp_enabled = True
 
 
-# Serve ephemeral artifacts (no persistent volume!)
-app.mount("/artifacts", StaticFiles(directory=str(ARTIFACTS_ROOT)),
-          name="artifacts")
+def _on_connection_lost(connection, exc):
+    """Called when connection is lost"""
+    logger.warning(f"[{Config.MODULE_NAME}] AMQP connection lost: {exc}")
+    app.state.amqp_enabled = False
+
+
+# setup AMQP connection
+
+async def _setup_amqp():  # Removed "_once" - this is the only version needed
+    """
+    Setup AMQP connection. connect_robust handles reconnection automatically.
+    """
+    try:
+        # connect_robust will keep retrying internally
+        app.state.amqp_conn = await aio_pika.connect_robust(
+            Config.RABBITMQ_URL,
+            reconnect_interval=5,      # Retry every 5 seconds if it drops
+            fail_fast=False,           # Don't give up, keep retrying
+        )
+        
+        # Add a callback to know when connection is lost/restored
+        app.state.amqp_conn.reconnect_callbacks.add(_on_reconnect)
+        app.state.amqp_conn.close_callbacks.add(_on_connection_lost)
+        
+        ch = await app.state.amqp_conn.channel()
+        await ch.set_qos(prefetch_count=1)
+        app.state.amqp_ch = ch
+
+        # Declare exchanges
+        app.state.work_ex = await ch.declare_exchange(
+            Config.WORK_EXCHANGE, aio_pika.ExchangeType.DIRECT, durable=True
+        )
+        app.state.results_ex = await ch.declare_exchange(
+            Config.RESULTS_EXCHANGE, aio_pika.ExchangeType.TOPIC, durable=True
+        )
+
+        # Declare and bind queue
+        q = await ch.declare_queue(Config.WORK_QUEUE_NAME, durable=True)
+        await q.bind(app.state.work_ex, routing_key=Config.WORK_ROUTING_KEY)
+
+        # Start consuming
+        await q.consume(_handle_work_message)
+        
+        logger.info(
+            f"[{Config.MODULE_NAME}] AMQP connected and consuming from '{Config.WORK_QUEUE_NAME}'"
+        )
+        app.state.amqp_enabled = True
+        
+    except (AMQPConnectionError, OSError, ConnectionRefusedError) as e:
+        # Initial connection failed - but connect_robust will keep trying in background
+        logger.warning(
+            f"[{Config.MODULE_NAME}] Initial AMQP connection failed: {e}. "
+            "Will retry automatically in background."
+        )
+        app.state.amqp_enabled = False
+        raise  # Re-raise so startup handler knows it failed
+
 
 # =============================================================================
-# Small helpers
+#  Utility functions
 # =============================================================================
-
 
 async def _http_download_to(dst: Path, url: str):
     """Download http(s) or copy file:// to dst"""
     dst.parent.mkdir(parents=True, exist_ok=True)
     u = urlparse(url)
+    #logger.info(f"downloading from {u}")
     if u.scheme in ("http", "https"):
         async with httpx.AsyncClient(timeout=120) as http:
             r = await http.get(url)
@@ -98,101 +122,9 @@ async def _http_download_to(dst: Path, url: str):
 
 
 def _art_uri(job_id: str,  name: str) -> str:
-    uri = f"{WORKER_BASE_URL}/artifacts/{job_id}/{name}"    
-    logger.info(f"Generated artifact URI for job_id={job_id}, name={name}: {uri}")
-    return uri
+    return f"{Config.WORKER_BASE_URL}/artifacts/{job_id}/{name}"
 
-
-
-# =============================================================================
-# HTTP API (kept for manual testing)
-# =============================================================================
-
-@app.post("/run")
-async def run(
-    request: Request,
-    xhtml: UploadFile = File(...),
-    braille_arguments_from_queue: Optional[str] = Form(default="{}"),
-    save_prepared_xhtml: Optional[bool] = Form(default=True),
-):
-    """
-    Input: XHTML file (UploadFile)
-    Returns a pef file and logs.
-    Manual test endpoint — not used by RabbitMQ flow.
-    """
-    t0 = time.time()
-    # Get original filename
-    xhtml_name = xhtml.filename or ""
-    suffix = Path(xhtml.filename or "").suffix or ".xhtml"
-
-    # Extract production_number from filename (basename without extension)
-    production_number = Path(xhtml_name).stem
-    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-        tmp.write(await xhtml.read())
-        xhtml_path = tmp.name
-
-    timestamp = datetime.now().strftime("%Y-%m-%d-%H%M%S%f")
-    job_id = f"{production_number}-{timestamp}"
-
-    try:
-        status = bok_to_pef(
-            xhtml_path, braille_arguments_from_queue, job_id, production_number,save_prepared_xhtml=save_prepared_xhtml,
-
-        )
-    finally:
-        try:
-            os.unlink(xhtml_path)
-        except Exception:
-            pass
-    logger.info("Validation completed, preparing artifacts...")
-    job_dir = ARTIFACTS_ROOT / job_id
-    logger.info(f"Job dir: {job_dir}")
-
-    if not os.path.isdir(job_dir):
-        logger.warning(
-            f"Could not find artifact folder for this job: {job_dir}")
-        raise HTTPException(
-            500, f"Could not find artifact folder for this job: {job_dir}")
-
-    # Zip the folder to a temp file for download
-    zip_base = os.path.join(tempfile.gettempdir(), f"{job_id}")
-    # returns path/to/<base>.zip
-    zip_path = shutil.make_archive(zip_base, "zip", job_dir)
-
-    headers = {
-        "X-Validation-Status": status.get("status"),
-        "X-Processing-Time-ms": str(int((time.time() - t0) * 1000)),
-    }
-    download_name = f"{production_number}-artifacts.zip"
-    return FileResponse(zip_path, media_type="application/zip", filename=download_name, headers=headers)
-
-
-@app.get("/download/{token}")
-async def download(token: str):
-    data = DOWNLOADS.pop(token, None)
-    if data is None:
-        return JSONResponse(status_code=404, content={"error": "File not found"})
-    return StreamingResponse(
-        io.BytesIO(data),
-        media_type="application/zip",
-        headers={"Content-Disposition": 'attachment; filename=\"result.zip\"'},
-    )
-
-
-@app.post("/admin/cleanup-artifacts")
-async def admin_cleanup_artifacts():
-    stats = cleanup_artifacts_once(
-        ARTIFACTS_ROOT, ARTIFACTS_RETENTION_HOURS, logger)
-    return {"ok": True, "retention_hours": ARTIFACTS_RETENTION_HOURS, "stats": stats}
-
-
-@app.get("/health")
-def health():
-    artifacts = summarize_artifacts(ARTIFACTS_ROOT)
-    print(artifacts)
-    return {"status": True, "module": MODULE_NAME}
-
-
+# Cleanup loop
 async def _cleanup_loop():
     """
     Periodically clean up old artifacts. Never raises.
@@ -200,14 +132,14 @@ async def _cleanup_loop():
     while True:
         try:
             stats = cleanup_artifacts_once(
-                ARTIFACTS_ROOT, ARTIFACTS_RETENTION_HOURS, logger)
+                Config.ARTIFACTS_ROOT, Config.ARTIFACTS_RETENTION_HOURS, logger)
             logger.debug("Artifacts cleanup stats: %s", stats)
         except Exception as e:
             logger.warning("Artifacts cleanup loop error: %r", e)
-        await asyncio.sleep(ARTIFACTS_CLEAN_INTERVAL_SEC)
+        await asyncio.sleep(Config.ARTIFACTS_CLEAN_INTERVAL_SEC)
 
 
-
+# Result publishing
 async def _publish_result(stage: str, job_id: str, status: str, artifacts: Dict, correlation_id: Optional[str]):
     rk = f"job.{job_id}.stage.{stage}.status.{status}"
     payload = {
@@ -227,6 +159,108 @@ async def _publish_result(stage: str, job_id: str, status: str, artifacts: Dict,
         message_id=str(uuid.uuid4()),
     )
     await app.state.results_ex.publish(msg, routing_key=rk)
+
+
+async def _save_and_publish_result(
+    stage: str,
+    job_id: str,
+    status: str,
+    artifacts: Dict,
+    correlation_id: Optional[str]
+):
+    """
+    Save result to disk first, then try to publish.
+    This ensures we never lose results even if publishing fails.
+    """
+    # 1. Save result to disk (ALWAYS succeeds)
+    result_data = {
+        "job_id": job_id,
+        "stage": stage,
+        "status": status,
+        "artifacts": artifacts,
+        "correlation_id": correlation_id,
+        "finished_at": time.time(),
+        "published": False
+    }
+    
+    result_file = Config.ARTIFACTS_ROOT / job_id / "result.json"
+    try:
+        result_file.write_text(json.dumps(result_data, indent=2, ensure_ascii=False))
+        logger.info(f"[{job_id}] Result saved to disk")
+    except Exception as e:
+        logger.error(f"[{job_id}] CRITICAL: Failed to save result: {e}")
+        # Continue anyway and try to publish
+    
+    # 2. Try to publish to RabbitMQ (might fail)
+    try:
+        if not app.state.amqp_enabled:
+            logger.warning(f"[{job_id}] AMQP not connected, result saved locally only")
+            return
+            
+        await _publish_result(stage, job_id, status, artifacts, correlation_id)
+        
+        # Mark as published
+        result_data["published"] = True
+        result_file.write_text(json.dumps(result_data, indent=2, ensure_ascii=False))
+        logger.info(f"[{job_id}] Result published to RabbitMQ")
+        
+    except (ChannelInvalidStateError, AMQPConnectionError) as e:
+        logger.warning(
+            f"[{job_id}] Failed to publish result: {e}. "
+            "Saved locally - will republish on message redelivery."
+        )
+    except Exception as e:
+        logger.error(f"[{job_id}] Unexpected error publishing: {e}")
+
+async def _republish_pending_results():
+    """
+    Background task to republish results that were saved but not published.
+    """
+    while True:
+        try:
+            await asyncio.sleep(60)  # Check every minute
+            
+            if not app.state.amqp_enabled:
+                continue
+
+            # Find unpublished results older than 5 seconds
+            # This prevents race condition with fresh results
+            cutoff_time = time.time() - 5
+            
+            # Find unpublished results
+            for result_file in Config.ARTIFACTS_ROOT.rglob("result.json"):
+                try:
+                    # Check file modification time first
+                    if result_file.stat().st_mtime > cutoff_time:
+                        continue  # Too recent, skip to avoid race condition
+
+                    result_data = json.loads(result_file.read_text())
+                    
+                    if result_data.get("published", False):
+                        continue  # Already published
+                    
+                    job_id = result_data["job_id"]
+                    logger.info(f"[{job_id}] Republishing pending result")
+                    
+                    await _publish_result(
+                        result_data["stage"],
+                        job_id,
+                        result_data["status"],
+                        result_data["artifacts"],
+                        result_data.get("correlation_id")
+                    )
+                    
+                    # Mark as published
+                    result_data["published"] = True
+                    result_file.write_text(json.dumps(result_data, indent=2))
+                    logger.info(f"[{job_id}] Pending result republished")
+                    
+                except Exception as e:
+                    logger.warning(f"Failed to republish result from {result_file}: {e}")
+                    
+        except Exception as e:
+            logger.error(f"Error in republish loop: {e}")
+
 
 
 # =============================================================================
@@ -263,7 +297,7 @@ async def _handle_work_message(m: aio_pika.IncomingMessage):
                 return
 
             # Setup workspace
-            job_dir = ARTIFACTS_ROOT / job_id
+            job_dir = Config.ARTIFACTS_ROOT / job_id
             job_dir.mkdir(parents=True, exist_ok=True)
             
             # =================================================================
@@ -384,192 +418,41 @@ async def _handle_work_message(m: aio_pika.IncomingMessage):
         )
 
 
-async def _save_and_publish_result(
-    stage: str,
-    job_id: str,
-    status: str,
-    artifacts: Dict,
-    correlation_id: Optional[str]
-):
+# =============================================================================
+# Lifespan Context Manager
+# =============================================================================
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     """
-    Save result to disk first, then try to publish.
-    This ensures we never lose results even if publishing fails.
+    Lifespan context manager for startup and shutdown events
     """
-    # 1. Save result to disk (ALWAYS succeeds)
-    result_data = {
-        "job_id": job_id,
-        "stage": stage,
-        "status": status,
-        "artifacts": artifacts,
-        "correlation_id": correlation_id,
-        "finished_at": time.time(),
-        "published": False
-    }
+    # Startup
+    logger.info(f"[{Config.MODULE_NAME}] Starting up...")
     
-    result_file = ARTIFACTS_ROOT / job_id / "result.json"
+    # Try initial AMQP connection
     try:
-        result_file.write_text(json.dumps(result_data, indent=2, ensure_ascii=False))
-        logger.info(f"[{job_id}] Result saved to disk")
-    except Exception as e:
-        logger.error(f"[{job_id}] CRITICAL: Failed to save result: {e}")
-        # Continue anyway and try to publish
-    
-    # 2. Try to publish to RabbitMQ (might fail)
-    try:
-        if not app.state.amqp_enabled:
-            logger.warning(f"[{job_id}] AMQP not connected, result saved locally only")
-            return
-            
-        await _publish_result(stage, job_id, status, artifacts, correlation_id)
-        
-        # Mark as published
-        result_data["published"] = True
-        result_file.write_text(json.dumps(result_data, indent=2, ensure_ascii=False))
-        logger.info(f"[{job_id}] Result published to RabbitMQ")
-        
-    except (ChannelInvalidStateError, AMQPConnectionError) as e:
-        logger.warning(
-            f"[{job_id}] Failed to publish result: {e}. "
-            "Saved locally - will republish on message redelivery."
-        )
-    except Exception as e:
-        logger.error(f"[{job_id}] Unexpected error publishing: {e}")
-
-
-async def _republish_pending_results():
-    """
-    Background task to republish results that were saved but not published.
-    """
-    while True:
-        try:
-            await asyncio.sleep(60)  # Check every minute
-            
-            if not app.state.amqp_enabled:
-                continue
-            
-            # Find unpublished results
-            for result_file in ARTIFACTS_ROOT.rglob("result.json"):
-                try:
-                    result_data = json.loads(result_file.read_text())
-                    
-                    if result_data.get("published", False):
-                        continue  # Already published
-                    
-                    job_id = result_data["job_id"]
-                    logger.info(f"[{job_id}] Republishing pending result")
-                    
-                    await _publish_result(
-                        result_data["stage"],
-                        job_id,
-                        result_data["status"],
-                        result_data["artifacts"],
-                        result_data.get("correlation_id")
-                    )
-                    
-                    # Mark as published
-                    result_data["published"] = True
-                    result_file.write_text(json.dumps(result_data, indent=2))
-                    logger.info(f"[{job_id}] Pending result republished")
-                    
-                except Exception as e:
-                    logger.warning(f"Failed to republish result from {result_file}: {e}")
-                    
-        except Exception as e:
-            logger.error(f"Error in republish loop: {e}")
-
-async def _setup_amqp():  # Removed "_once" - this is the only version needed
-    """
-    Setup AMQP connection. connect_robust handles reconnection automatically.
-    """
-    try:
-        # connect_robust will keep retrying internally
-        app.state.amqp_conn = await aio_pika.connect_robust(
-            RABBITMQ_URL,
-            reconnect_interval=5,      # Retry every 5 seconds if it drops
-            fail_fast=False,           # Don't give up, keep retrying
-        )
-        
-        # Add a callback to know when connection is lost/restored
-        app.state.amqp_conn.reconnect_callbacks.add(_on_reconnect)
-        app.state.amqp_conn.close_callbacks.add(_on_connection_lost)
-        
-        ch = await app.state.amqp_conn.channel()
-        await ch.set_qos(prefetch_count=1)
-        app.state.amqp_ch = ch
-
-        # Declare exchanges
-        app.state.work_ex = await ch.declare_exchange(
-            WORK_EXCHANGE, aio_pika.ExchangeType.DIRECT, durable=True
-        )
-        app.state.results_ex = await ch.declare_exchange(
-            RESULTS_EXCHANGE, aio_pika.ExchangeType.TOPIC, durable=True
-        )
-
-        # Declare and bind queue
-        q = await ch.declare_queue(WORK_QUEUE_NAME, durable=True)
-        await q.bind(app.state.work_ex, routing_key=WORK_ROUTING_KEY)
-
-        # Start consuming
-        await q.consume(_handle_work_message)
-        
-        logger.info(
-            f"[{MODULE_NAME}] AMQP connected and consuming from '{WORK_QUEUE_NAME}'"
-        )
-        app.state.amqp_enabled = True
-        
-    except (AMQPConnectionError, OSError, ConnectionRefusedError) as e:
-        # Initial connection failed - but connect_robust will keep trying in background
-        logger.warning(
-            f"[{MODULE_NAME}] Initial AMQP connection failed: {e}. "
-            "Will retry automatically in background."
-        )
-        app.state.amqp_enabled = False
-        raise  # Re-raise so startup handler knows it failed
-
-
-def _on_reconnect(connection):
-    """Called when connection is re-established"""
-    logger.info(f"[{MODULE_NAME}] AMQP connection restored!")
-    app.state.amqp_enabled = True
-
-
-def _on_connection_lost(connection, exc):
-    """Called when connection is lost"""
-    logger.warning(f"[{MODULE_NAME}] AMQP connection lost: {exc}")
-    app.state.amqp_enabled = False
-
-
-@app.on_event("startup")
-async def on_startup():
-    """
-    Startup handler - simpler without custom reconnection loop
-    """
-    # Try initial connection
-    try:
-        await _setup_amqp()  # This is the function above
-        logger.info(f"[{MODULE_NAME}] Successfully connected to RabbitMQ")
+        await _setup_amqp()
+        logger.info(f"[{Config.MODULE_NAME}] Successfully connected to RabbitMQ")
     except Exception as e:
         logger.warning(
-            f"[{MODULE_NAME}] Initial RabbitMQ connection failed: {e}. "
+            f"[{Config.MODULE_NAME}] Initial RabbitMQ connection failed: {e}. "
             "Application will continue without message queue. "
             "connect_robust will retry in background."
         )
-        # App continues running - HTTP endpoints still work
-        # connect_robust keeps trying to connect in background
     
-    # Start cleanup loop (unrelated to AMQP)
+    # Start cleanup loop
     logger.info("Starting artifacts cleanup loop...")
     app.state._cleanup_task = asyncio.create_task(_cleanup_loop())
 
-    # Start republisher (optional)
+    # Start republisher
     logger.info("Starting result republisher...")
     app.state._republish_task = asyncio.create_task(_republish_pending_results())
-
-
-
-@app.on_event("shutdown")
-async def shutdown():
-    """Simplified shutdown - no reconnector task to cancel"""
+    
+    yield
+    
+    # Shutdown
+    logger.info(f"[{Config.MODULE_NAME}] Shutting down...")
     
     # Stop cleanup loop
     task = getattr(app.state, "_cleanup_task", None)
@@ -577,11 +460,130 @@ async def shutdown():
         task.cancel()
         with suppress(asyncio.CancelledError):
             await task
+    
+    # Stop republisher
+    task = getattr(app.state, "_republish_task", None)
+    if task:
+        task.cancel()
+        with suppress(asyncio.CancelledError):
+            await task
 
-    # Close AMQP (connect_robust handles cleanup internally)
+    # Close AMQP
     conn = getattr(app.state, "amqp_conn", None)
     if conn:
         with suppress(Exception):
-            await conn.close()
+            await conn
     
-    logger.info(f"[{MODULE_NAME}] Shutdown complete")
+    logger.info(f"[{Config.MODULE_NAME}] Shutdown complete")
+
+
+
+# =============================================================================
+# FastAPI
+# =============================================================================
+
+# app = FastAPI(title=Config.MODULE_NAME, version="2.0.0", debug=True)
+app = FastAPI(title=Config.MODULE_NAME, version="2.0.0", debug=True, lifespan=lifespan)
+app.state.amqp_enabled = False
+app.state.amqp_conn = None
+app.state.amqp_ch = None
+app.state._amqp_reconnector_task = None  # background task handle
+RECONNECT_DELAY_SECONDS = 30
+
+# Track current job to avoid deleting it while processing (optional but recommended)
+app.state.current_job = getattr(app.state, "current_job", {
+                                "running": False, "production_number": None, "status": None, "job_id": None})
+
+
+# Serve ephemeral artifacts (no persistent volume!)
+app.mount("/artifacts", StaticFiles(directory=str(Config.ARTIFACTS_ROOT)),
+          name="artifacts")
+
+# =============================================================================
+# HTTP API (kept for manual testing)
+# =============================================================================
+
+@app.post("/run")
+async def run(
+    request: Request,
+    xhtml: UploadFile = File(...),
+    braille_arguments_from_queue: Optional[str] = Form(default="{}"),
+    save_prepared_xhtml: Optional[bool] = Form(default=True),
+):
+    """
+    Input: XHTML file (UploadFile)
+    Returns a pef file and logs.
+    Manual test endpoint — not used by RabbitMQ flow.
+    """
+    t0 = time.time()
+    # Get original filename
+    xhtml_name = xhtml.filename or ""
+    suffix = Path(xhtml.filename or "").suffix or ".xhtml"
+
+    # Extract production_number from filename (basename without extension)
+    production_number = Path(xhtml_name).stem
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+        tmp.write(await xhtml.read())
+        xhtml_path = tmp.name
+
+    timestamp = datetime.now().strftime("%Y-%m-%d-%H%M%S%f")
+    job_id = f"{production_number}-{timestamp}"
+
+    try:
+        status = bok_to_pef(
+            xhtml_path, braille_arguments_from_queue, job_id, production_number,save_prepared_xhtml=save_prepared_xhtml,
+
+        )
+    finally:
+        try:
+            os.unlink(xhtml_path)
+        except Exception:
+            pass
+    logger.info("Validation completed, preparing artifacts...")
+    job_dir = Config.ARTIFACTS_ROOT / job_id
+    logger.info(f"Job dir: {job_dir}")
+
+    if not os.path.isdir(job_dir):
+        logger.warning(
+            f"Could not find artifact folder for this job: {job_dir}")
+        raise HTTPException(
+            500, f"Could not find artifact folder for this job: {job_dir}")
+
+    # Zip the folder to a temp file for download
+    zip_base = os.path.join(tempfile.gettempdir(), f"{job_id}")
+    # returns path/to/<base>.zip
+    zip_path = shutil.make_archive(zip_base, "zip", job_dir)
+
+    headers = {
+        "X-Validation-Status": status.get("status"),
+        "X-Processing-Time-ms": str(int((time.time() - t0) * 1000)),
+    }
+    download_name = f"{production_number}-artifacts.zip"
+    return FileResponse(zip_path, media_type="application/zip", filename=download_name, headers=headers)
+
+
+@app.get("/download/{token}")
+async def download(token: str):
+    data = DOWNLOADS.pop(token, None)
+    if data is None:
+        return JSONResponse(status_code=404, content={"error": "File not found"})
+    return StreamingResponse(
+        io.BytesIO(data),
+        media_type="application/zip",
+        headers={"Content-Disposition": 'attachment; filename=\"result.zip\"'},
+    )
+
+
+@app.post("/admin/cleanup-artifacts")
+async def admin_cleanup_artifacts():
+    stats = cleanup_artifacts_once(
+        Config.ARTIFACTS_ROOT, Config.ARTIFACTS_RETENTION_HOURS, logger)
+    return {"ok": True, "retention_hours": Config.ARTIFACTS_RETENTION_HOURS, "stats": stats}
+
+
+@app.get("/health")
+def health():
+    artifacts = summarize_artifacts(Config.ARTIFACTS_ROOT)
+    print(artifacts)
+    return {"status": True, "module": Config.MODULE_NAME}
+
