@@ -13,6 +13,7 @@ import json
 #from daisy_pipeline_light import RemoteDaisyPipelineJob
 from daisy_pipeline import DaisyPipelineJob
 from prepare_for_pef import prepare_for_pef
+from config import Config
 
 PROJECT_ROOT = Path(__file__).resolve().parent
 XSLT_DIR = PROJECT_ROOT / "xslt" / "prepare-for-braille"
@@ -220,13 +221,17 @@ def bok_to_pef(html, braille_arguments_from_queue, job_id, production_number,
         "braille.scss": os.path.join(XSLT_DIR, "braille.scss")
     }
 
-    pipeline_and_script_version = [
-        ("1.15.2", "8.2.1"),
-        #("1.14.17-p1", "6.2.0"),
+    """pipeline_and_script_version = [
+         ("1.15.4-SNAPSHOT", "9.0.0"),
+        # ("1.15.2", "8.2.1"),
+        ("1.14.17-p1", "6.2.0"),
         #("1.14.17-p2-SNAPSHOT", "6.2.0"),
         #("1.14.14", "6.1.0"),
         #("1.14.14", "6.1.0"),
-    ]
+    ]"""
+
+    #pipeline_and_script_version = [Config.PIP_PEF_STABLE, Config.PIP_PEF_TEST, Config.PIP_PEF_TEST2,]
+    pipeline_and_script_version = [*Config.PIP_PEF_STABLE, *Config.PIP_PEF_TEST]
 
     script_id = "html-to-pef"
     braille_arguments = arguments
@@ -238,23 +243,14 @@ def bok_to_pef(html, braille_arguments_from_queue, job_id, production_number,
             found_pipeline_version = dp2_job.found_pipeline_version
             found_script_version = dp2_job.found_script_version
 
-            # get conversion report
-            if os.path.isdir(os.path.join(dp2_job.dir_output, "preview-output-dir")):
-                #save pef-priveiw to utgave-ut PEF instead of report.
-                #Filesystem.copy(self.utils.report,
-                #                os.path.join(dp2_job.dir_output, "preview-output-dir"),
-                #                os.path.join(self.utils.report.reportDir(), "preview"))
-                #self.utils.report.attachment(None,
-                #                             os.path.join(self.utils.report.reportDir(), "preview" + "/" + identifier + ".pef.html"),
-                #                             "SUCCESS" if dp2_job.status == "SUCCESS" else "ERROR")
-                logger.info("Saving files")
+
            
             if dp2_job.status != "SUCCESS":
                 logger.info("Klarte ikke å konvertere boken")
                 message=  production_number + " feilet 😭👎" 
                 pip_log = dp2_job.job_log
                 return _finish(False, "FAIL", message)
-
+            
             dp2_pef_dir = os.path.join(dp2_job.dir_output, "pef-output-dir")
             dp2_new_pef_dir = os.path.join(dp2_job.dir_output, "output-dir")
             #for pip version 1.14.15 and newer
@@ -271,6 +267,20 @@ def bok_to_pef(html, braille_arguments_from_queue, job_id, production_number,
                 return False
             if os.path.isdir(os.path.join(dp2_job.dir_output, "preview-output-dir")):
                 logger.info("Preview files exist - copy to output")
+
+            # get pef-preview files and copy to output
+            if os.path.isdir(os.path.join(dp2_job.dir_output, "preview-output-dir")):
+                logger.info("Copying preview files to output")
+                preview_output_dir = os.path.join(dp2_job.dir_output, "preview-output-dir")
+                for item in os.listdir(preview_output_dir):
+                    s = os.path.join(preview_output_dir, item)
+                    d = os.path.join(dp2_pef_dir, item)
+                    if os.path.isdir(s):
+                        shutil.copytree(s, d, dirs_exist_ok=True)
+                    else:
+                        shutil.copy2(s, d)
+            else:
+                logger.info("No preview files to copy")
 
             pip_output = dp2_pef_dir
             
