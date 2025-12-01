@@ -642,17 +642,18 @@ aside {
 			display: inline;
 		}
 
-		> :first-child:not(ul, ol)::before,
+		> p:first-child::before, /* you can add more selectors like this, for every
+		                          * block element that can appear inside prodnote */
 		> ul:first-child > :first-child::before,
 		> ol:first-child > :first-child::before,
-		&:not(:has(*))::before {
+		&:not(:has(ul, ol, p))::before {
 			content: "⠰⠄";
 		}
 
-		> :last-child:not(ul, ol)::after,
+		> p:last-child::after,
 		> ul:last-child > :last-child::after,
 		> ol:last-child > :last-child::after,
-		&:not(:has(*))::after {
+		&:not(:has(ul, ol, p))::after {
 			content: "⠠⠆";
 		}
 	}
