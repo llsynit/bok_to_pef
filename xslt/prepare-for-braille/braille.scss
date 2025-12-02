@@ -250,16 +250,17 @@ h1, h2, h3, h4, h5, h6 {
 /* Insert generated content at start of volume */
 @-daisy-volume {
 	@begin {
-		content: -daisy-flow(front, document)
+		content: -daisy-flow(titlepage, document)
 		         -daisy-flow(volume-toc, document);
 	}
 }
 
 @-daisy-volume:first {
 	@begin {
-		content: -daisy-flow(front-first, document)
+		content: -daisy-flow(titlepage-first, document)
 		         -daisy-flow(document-toc, document)
-		         -daisy-flow(volume-toc, document);
+		         -daisy-flow(volume-toc, document)
+		         -daisy-flow(other-front, document);
 	}
 }
 
@@ -281,9 +282,9 @@ h1, h2, h3, h4, h5, h6 {
 		text-align: right;
 	}
 
-	-daisy-flow: front-first;
+	-daisy-flow: titlepage-first;
 	&::duplicate {
-		-daisy-flow: front;
+		-daisy-flow: titlepage;
 	}
 }
 
@@ -387,7 +388,7 @@ html:has(> head > meta[name="dc:language"][content|="nb"]) #generated-volume-toc
 	/* Can not be put in the normal flow because of how the .notes-placement and
 	 * .notes-placement-fallback fields are currently implemented.
 	 */
-	-daisy-flow: front-first;
+	-daisy-flow: other-front;
 	hyphens: none;
 }
 
