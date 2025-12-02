@@ -244,9 +244,6 @@ section {
 		margin-bottom: 0;
 		text-align: left;
 	}
-	& > .Innrykk-5{
-		text: indent 18em;
-	}
 	& > .Høyre-justert {
 		text-align: right;
 	}
@@ -479,15 +476,6 @@ h1[epub|type~="z3998:author"] {
 	i {
 		-daisy-text-transform: -louis-italic;
 	}
-}
-
-u {
-	-daisy-text-transform: u;
-}
-
-strike,
-s {
-	-daisy-text-transform: strike;
 }
 
 sub {
