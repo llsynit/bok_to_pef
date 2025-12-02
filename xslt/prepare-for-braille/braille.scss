@@ -13,7 +13,6 @@ $default-table-class: table-matrix !default;
 $page-width: 40 !default;
 $hyphenation: true !default;
 $force-norwegian: true !default;
-$duplex: true !default;
 $include-strong: true !default;
 $include-em: true !default;
 
@@ -339,20 +338,6 @@ html:has(> head > meta[name="dc:language"][content|="nb"]) #generated-volume-toc
 	 */
 	-daisy-flow: front-first;
 	hyphens: none;
-}
-
-/* Page count */
-.pef-pages {
-	display: inline;
-
-	&::after {
-		display: inline;
-		@if $duplex {
-			content: -obfl-evaluate("(round (* $sheets-in-document 2))");
-		} @else {
-			content: -obfl-evaluate("(round $sheets-in-document)");
-		}
-	}
 }
 
 /* -------------------------------------------------------------------------- */
