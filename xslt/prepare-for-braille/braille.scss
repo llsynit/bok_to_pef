@@ -589,6 +589,34 @@ h3, h4, h5, h6 {
 	}
 }
 
+h1, h2, h3, h4, h5, h6 {
+
+	/* h1-h6 elements with the class "braille-task-heading" should have this style applied
+	 * instead of the normal headline style.
+	 */
+	&.braille-task-heading {
+		/* Override any other headline styles defined above */
+		margin: 1 5 0 0;
+		border: none;
+		padding: 0;
+		-obfl-underline: ⠉;
+	}
+
+	/* h1-h6 elements inside an aside or section with class="glossary" should have this style
+	 * applied instead of the normal headline style (see markup requirements 2.4.4).
+	 */
+	section.glossary &,
+	aside.glossary &,
+	/* alternatively put the class "braille-glossary-heading" on the headline element */
+	&.braille-glossary-heading {
+		/* Override any other headline styles defined above */
+		margin: 0;
+		border: none;
+		padding: 0;
+		-obfl-underline: none;
+	}
+}
+
 /* -------------------------------------------------------------------------- */
 /*                Other elements                                              */
 /* -------------------------------------------------------------------------- */
