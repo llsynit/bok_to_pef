@@ -8,8 +8,6 @@ $show-print-page-numbers: true !default;
 $show-braille-page-numbers: true !default;
 $line-spacing: false !default;
 $include-notes: true !default;
-$include-images: true !default;
-$include-captions: true !default;
 $notes-placement: end-of-volume !default;
 $default-table-class: table-matrix !default;
 $page-width: 40 !default;
@@ -659,47 +657,30 @@ figure.image {
 	}
 }
 
-/* Show image captions */
-@if $include-captions {
-	figure:has(img) {
+/* Image captions */
+figure:has(img) {
+	display: block;
+	figcaption {
 		display: block;
-		figcaption {
-			display: block;
-			margin-top: 0;
-			margin-bottom: 0;
-			margin-left: 2;
-			text-indent: 2;
-			&::before {
-				content: "Bildetekst: ";
-			}
-		}
-	}
-} @else {
-	figure:has(img) {
-		figcaption {
-			display: none;
+		margin-top: 0;
+		margin-bottom: 0;
+		margin-left: 2;
+		text-indent: 2;
+		&::before {
+			content: "Bildetekst: ";
 		}
 	}
 }
 
 /* Show alt text for images with alt text (except decorative images) */
-@if $include-images {
-	img[alt]:not([alt=""], [alt="image"])::after {
-		display: block;
-		content: "Bilde: " attr(alt);
-		orphans: 2; /* todo check */
-		margin-top: 1;
-		margin-bottom: 0;
-		margin-left: 2;
-		text-indent: 0;
-	}
-} @else {
-	img {
-		display: none;
-		&::after {
-			content: none;
-		}
-	}
+img[alt]:not([alt=""], [alt="image"])::after {
+	display: block;
+	content: "Bilde: " attr(alt);
+	orphans: 2; /* todo check */
+	margin-top: 1;
+	margin-bottom: 0;
+	margin-left: 2;
+	text-indent: 0;
 }
 
 /* -------------------------------------------------------------------------- */
