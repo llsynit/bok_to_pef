@@ -281,11 +281,11 @@ html:has(> head > meta[name="dc:language"][content|="nb"]) #generated-document-t
 #generated-document-toc {
 	-daisy-flow: document-toc;
 	margin-left: 0; /* no left margin on toc lists */
-	margin-top: 0; /* <- this line was added */
-	margin-bottom: 0; /* <- this line was added */
+	margin-top: 0;
+	margin-bottom: 0;
 
 	&::-obfl-on-toc-start {
-		page-break-before: always; /* <- this line was added */
+		page-break-before: always;
 		display: block;
 		border-bottom: none;
 		border-left: none;
@@ -961,8 +961,6 @@ dt,
 dd {
 	display: inline;
 }
-
-/* added list-style-type classes */
 
 .list-style-type-decimal {
 	list-style-type: decimal;
