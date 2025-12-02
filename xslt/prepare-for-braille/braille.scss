@@ -725,9 +725,11 @@ p.braille-no-indent {
 	orphans: 2;
 }
 
-.image {
-	/* dummy class */
-	color: aliceblue;
+@media screen {
+	.image {
+		/* dummy class */
+		color: aliceblue;
+	}
 }
 
 blockquote {
