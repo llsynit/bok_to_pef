@@ -20,34 +20,88 @@ $include-em: true !default;
 /*                Page layout                                                 */
 /* -------------------------------------------------------------------------- */
 
-/* Count pages continuously but hide them in generated pages */
+/* Default margins (when there is no page number indication) */
 @page {
-
-	/* Set counter-increment explicitly because otherwise it will be implicitly set to
-	 * "pre-page" or "post-page" when in a
-	 */
-	counter-increment: page;
 	margin-right: 2;
-	@if $show-print-page-numbers {
-		margin-left: 2;
-	} @else {
-		margin-left: 1;
-	}
-}
-
-body {
-	page: body;
-}
-
-.pef-titlepage,
-.pef-about,
-#generated-volume-toc,
-#generated-document-toc {
-	page: auto;
+	margin-left: 1;
 }
 
 /* -------------------------------------------------------------------------- */
-/*                Braille and print page numbers                              */
+/*                Braille page numbers                                        */
+/* -------------------------------------------------------------------------- */
+
+@if $show-braille-page-numbers {
+
+	/* Base page style that other page styles inherit from */
+	@page {
+		/* Counter for volume 1 and bodies of volumes 2, 3, ... */
+		/* Numbering in new volume continues where previous volume left off */
+		/* Count pages but hide them by default (notably on title pages) */
+		counter-increment: page;
+	}
+
+	.pef-titlepage {
+		page: auto;
+	}
+
+	/* Page style for frontmatter pages in volume 1 except title page */
+	@page front-first {
+		margin-bottom: 1;
+		@bottom-center {
+			content: counter(page, lower-roman);
+		}
+	}
+
+	@volume:first {
+		@begin {
+			page: front-first;
+			// FIXME: enable in future Pipeline version
+			//counter-set: none; /* override the counter-set in @volume below */
+		}
+	}
+
+	/* Page style for title pages in volumes 2, 3, ... */
+	@page titlepage {
+		/* Count pages but hide them */
+		counter-increment: front;
+	}
+
+	.pef-titlepage::duplicate {
+		page: titlepage;
+	}
+
+	/* Page style for other frontmatter pages in volumes 2, 3, ... */
+	@page front {
+		counter-increment: front;
+		margin-bottom: 1;
+		@bottom-center {
+			content: counter(front, lower-roman);
+		}
+	}
+
+	@volume {
+		@begin {
+			page: front;
+			/* Restart numbering of frontmatter pages in each volume */
+			counter-set: front 1;
+		}
+	}
+
+	/* Page style for body */
+	@page body {
+		margin-bottom: 1;
+		@bottom-center {
+			content: counter(page);
+		}
+	}
+
+	body {
+		page: body;
+	}
+}
+
+/* -------------------------------------------------------------------------- */
+/*                Print page numbers                                          */
 /* -------------------------------------------------------------------------- */
 
 /* Don't show pagenumber inline. Store reference in case we want to show marker in
@@ -60,6 +114,11 @@ body {
 
 /* Show page numbers in bodymatter and backmatter. */
 @if $show-print-page-numbers {
+
+	@page {
+		margin-left: 2;
+	}
+
 	[epub|type~="pagebreak"] {
 		&[title] {
 			string-set: print-page attr(title)
@@ -82,14 +141,9 @@ body {
 	section[epub|type~="frontmatter"] + section:not([epub|type~="frontmatter"]) {
 		string-set: print-page "";
 	}
-}
 
-@page body {
-	@if $show-print-page-numbers or $show-braille-page-numbers {
+	@page body {
 		margin-bottom: 1;
-	}
-
-	@if $show-print-page-numbers {
 		@bottom-right {
 			content: string(print-page-break-indicator, first)
 			         string(print-page, last);
@@ -97,12 +151,6 @@ body {
 		@left { // @-daisy-left
 			content: -obfl-marker-indicator(pagenum, "⠿");
 			-daisy-text-transform: none;
-		}
-	}
-
-	@if $show-braille-page-numbers {
-		@bottom-center {
-			content: counter(page);
 		}
 	}
 }
@@ -209,8 +257,7 @@ h1, h2, h3, h4, h5, h6 {
 
 @-daisy-volume:first {
 	@begin {
-		content: -daisy-flow(front, document)
-		         -daisy-flow(front-first, document)
+		content: -daisy-flow(front-first, document)
 		         -daisy-flow(document-toc, document)
 		         -daisy-flow(volume-toc, document);
 	}
@@ -220,7 +267,6 @@ h1, h2, h3, h4, h5, h6 {
  * (first body) before the first level1 (section).
  */
 .pef-titlepage {
-	-daisy-flow: front;
 	display: block;
 	margin-top: 0;
 	margin-left: 1;
@@ -233,6 +279,11 @@ h1, h2, h3, h4, h5, h6 {
 	}
 	& > .Høyre-justert {
 		text-align: right;
+	}
+
+	-daisy-flow: front-first;
+	&::duplicate {
+		-daisy-flow: front;
 	}
 }
 
