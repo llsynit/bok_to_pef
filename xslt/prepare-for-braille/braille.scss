@@ -117,9 +117,9 @@ body {
 			content: string(print-page-break-indicator, first)
 			         string(print-page, last);
 		}
-		@left {
+		@left { // @-daisy-left
 			content: -obfl-marker-indicator(pagenum, "⠿");
-			text-transform: none;
+			-daisy-text-transform: none;
 		}
 	}
 
@@ -163,7 +163,7 @@ section[epub|type~="part"] {
 	& ~ section[epub|type~="part"] {
 		/* Note: this selector assumes that parts in EPUBs are sibling elements. */
 		/* Always start a new volume before a new part. */
-		volume-break-before: always;
+		-daisy-volume-break-before: always;
 	}
 }
 
@@ -190,7 +190,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 br.volume-break {
-	volume-break-before: always;
+	-daisy-volume-break-before: always;
 }
 
 /* Class that can be used to insert manual page breaks */
@@ -211,19 +211,19 @@ section {
 /* -------------------------------------------------------------------------- */
 
 /* Insert generated content at start of volume */
-@volume {
+@-daisy-volume {
 	@begin {
-		content: flow(front, document)
-		         flow(volume-toc, document);
+		content: -daisy-flow(front, document)
+		         -daisy-flow(volume-toc, document);
 	}
 }
 
-@volume:first {
+@-daisy-volume:first {
 	@begin {
-		content: flow(front, document)
-		         flow(front-first, document)
-		         flow(document-toc, document)
-		         flow(volume-toc, document);
+		content: -daisy-flow(front, document)
+		         -daisy-flow(front-first, document)
+		         -daisy-flow(document-toc, document)
+		         -daisy-flow(volume-toc, document);
 	}
 }
 
@@ -231,9 +231,9 @@ section {
  * (first body) before the first level1 (section).
  */
 .pef-titlepage {
-	flow: front;
+	-daisy-flow: front;
 	display: block;
-	text-transform: uncontracted;
+	-daisy-text-transform: uncontracted;
 	margin-top: 0;
 	margin-left: 1;
 	margin-right: 1;
@@ -279,7 +279,7 @@ html:has(> head > meta[name="dc:language"][content|="nb"]) #generated-document-t
 }
 
 #generated-document-toc {
-	flow: document-toc;
+	-daisy-flow: document-toc;
 	margin-left: 0; /* no left margin on toc lists */
 	margin-top: 0; /* <- this line was added */
 	margin-bottom: 0; /* <- this line was added */
@@ -309,8 +309,8 @@ html:has(> head > meta[name="dc:language"][content|="nb"]) #generated-document-t
 			text-indent: -2;
 			&::after {
 				/* The print page numbers are placed in rounded brackets after each heading in the TOC. */
-				content: " (" target-string(attr(href), print-page) ")"
-				         " " leader("⠄", $page-width - if($show-print-page-numbers, 2, 1) - 2, right)
+				content: " (" -daisy-target-string(attr(href), print-page) ")"
+				         " " /*-obfl-*/leader("⠄", $page-width - if($show-print-page-numbers, 2, 1) - 2, right)
 				         " " target-counter(attr(href), page);
 			}
 		}
@@ -330,7 +330,7 @@ html:has(> head > meta[name="dc:language"][content|="nb"]) #generated-volume-toc
 }
 
 #generated-volume-toc {
-	flow: volume-toc;
+	-daisy-flow: volume-toc;
 	margin-left: 0; /* no left margin on toc lists */
 	margin-top: 0; /* <- this line was added */
 	margin-bottom: 0; /* <- this line was added */
@@ -360,8 +360,8 @@ html:has(> head > meta[name="dc:language"][content|="nb"]) #generated-volume-toc
 			text-indent: -2;
 			&::after {
 				/* The print page numbers are placed in rounded brackets after each heading in the TOC. */
-				content: " (" target-string(attr(href), print-page) ")"
-				         " " leader("⠄", $page-width - if($show-print-page-numbers, 2, 1) - 2, right)
+				content: " (" -daisy-target-string(attr(href), print-page) ")"
+				         " " /*-obfl-*/leader("⠄", $page-width - if($show-print-page-numbers, 2, 1) - 2, right)
 				         " " target-counter(attr(href), page);
 			}
 		}
@@ -392,7 +392,7 @@ html:has(> head > meta[name="dc:language"][content|="nb"]) #generated-volume-toc
 	/* Can not be put in the normal flow because of how the .notes-placement and
 	 * .notes-placement-fallback fields are currently implemented.
 	 */
-	flow: front-first;
+	-daisy-flow: front-first;
 	hyphens: none;
 }
 
@@ -464,12 +464,12 @@ h1[epub|type~="z3998:author"] {
 	b {
 		@if ($include-em) {
 			/* NB! strong and em shall both have 23...56 */
-			text-transform: -louis-italic;
+			-daisy-text-transform: -louis-italic;
 			:root:not(:has(em, i)) & {
-				text-transform: -louis-italic;
+				-daisy-text-transform: -louis-italic;
 			}
 		} @else {
-			text-transform: -louis-italic;
+			-daisy-text-transform: -louis-italic;
 		}
 	}
 }
@@ -477,25 +477,25 @@ h1[epub|type~="z3998:author"] {
 @if ($include-em) {
 	em,
 	i {
-		text-transform: -louis-italic;
+		-daisy-text-transform: -louis-italic;
 	}
 }
 
 u {
-	text-transform: u;
+	-daisy-text-transform: u;
 }
 
 strike,
 s {
-	text-transform: strike;
+	-daisy-text-transform: strike;
 }
 
 sub {
-	text-transform: -louis-sub;
+	-daisy-text-transform: -louis-sub;
 }
 
 sup {
-	text-transform: -louis-super;
+	-daisy-text-transform: -louis-super;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -504,15 +504,15 @@ sup {
 
 .uncontracted-letters,
 h1 {
-	text-transform: uncontracted;
+	-daisy-text-transform: uncontracted;
 }
 
 [xml|lang]:not([xml|lang|="no"]),
 [lang]:not([lang|="no"]) {
-	text-transform: uncontracted;
+	-daisy-text-transform: uncontracted;
 	[xml|lang|="no"], [lang|="no"] {
 		/* "contracted" means "allow contracted" */
-		text-transform: contracted;
+		-daisy-text-transform: contracted;
 	}
 }
 
@@ -671,10 +671,10 @@ h1, *[epub|type~="part"] h2 {
 
 /* part */
 *[epub|type~="part"] h1 {
-	border-bottom: ⠤;
-	border-left: ⠇;
-	border-right: ⠸;
-	border-top: ⠉;
+	-daisy-border-bottom: ⠤;
+	-daisy-border-left: ⠇;
+	-daisy-border-right: ⠸;
+	-daisy-border-top: ⠉;
 	margin-bottom: 2;
 	margin-left: 2;
 	margin-right: 2;
@@ -767,8 +767,8 @@ aside[epub|type~="sidebar"] p:first-child {
 	margin-left: 0;
 	text-indent: 0;
 	text-align: left;
-	border-top: ⠤;
-	border-bottom: ⠉;
+	-daisy-border-top: ⠤;
+	-daisy-border-bottom: ⠉;
 	orphans: 3;
 	widows: 3;
 }
@@ -822,8 +822,8 @@ div[epub|type~="sidebar"] p:first-child {
 }
 
 .braille-div-strek {
-	border-top: ⠤;
-	border-bottom: ⠉;
+	-daisy-border-top: ⠤;
+	-daisy-border-bottom: ⠉;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -1039,15 +1039,15 @@ table {
 
 	&%table-matrix-transposed {
 		@extend %table-matrix;
-		render-table-by: column;
+		-daisy-render-table-by: column;
 	}
 
 	&%table-linearized {
 		display: block;
-		render-table-by: row;
+		-daisy-render-table-by: row;
 		&:has(> thead          th):not(:has(> :not(thead         ) th)),
 		&:has(> tr:first-child th):not(:has(> :not(tr:first-child) th)) {
-			render-table-by: column;
+			-daisy-render-table-by: column;
 		}
 		&::list-item {
 			display: block;
@@ -1060,7 +1060,7 @@ table {
 			&::list-item {
 				&::before {
 					content: " ⠆ ";
-					text-transform: none;
+					-daisy-text-transform: none;
 					hyphens: initial;
 				}
 				&:first-child {
@@ -1078,10 +1078,10 @@ table {
 
 	&%table-as-list {
 		display: block;
-		render-table-by: row;
+		-daisy-render-table-by: row;
 		&:has(> thead          th):not(:has(> :not(thead         ) th)),
 		&:has(> tr:first-child th):not(:has(> :not(tr:first-child) th)) {
-			render-table-by: column;
+			-daisy-render-table-by: column;
 		}
 		th::after {
 			content: ": ";
@@ -1225,10 +1225,10 @@ a[epub|type~="noteref"] {
 	margin-right: 0;
 	margin-bottom: 1;
 	text-align: center;
-	border-top: ⠉;
-	border-bottom: ⠉;
+	-daisy-border-top: ⠉;
+	-daisy-border-bottom: ⠉;
 	content: "Fotnoter";
-	text-transform: auto;
+	-daisy-text-transform: auto;
 }
 
 /* Noteref numbering is implemented in pre-processing.xsl.
@@ -1241,12 +1241,12 @@ a[epub|type~="noteref"] {
 	}
 	&::alternate {
 		display: block;
-		content: target-content(attr($refattr));
+		content: -daisy-target-content(attr($refattr));
 		margin-left: 4;
 		@if ($notes-placement == "bottom-of-page") {
-			flow: footnotes;
+			-daisy-flow: footnotes;
 		} @else {
-			flow: endnotes;
+			-daisy-flow: endnotes;
 		}
 	}
 }
@@ -1267,10 +1267,10 @@ a[epub|type~="noteref"] {
 
 	@if ($notes-placement == "bottom-of-page") {
 		@page {
-			@footnotes {
-				content: flow(footnotes, page);
+			@footnotes { // @-daisy-footnotes
+				content: -daisy-flow(footnotes, page);
 				max-height: 15;
-				border-top: ⠤;
+				-daisy-border-top: ⠤;
 				margin-left: 0;
 				-obfl-fallback-collection: endnotes;
 			}
@@ -1289,7 +1289,7 @@ a[epub|type~="noteref"] {
 					@include endnotes-title;
 					page-break-before: right;
 				}
-				content: flow(endnotes, document);
+				content: -daisy-flow(endnotes, document);
 			}
 		}
 	}
@@ -1297,13 +1297,13 @@ a[epub|type~="noteref"] {
 		html {
 			&:has(noteref, a[epub|type~="noteref"])::alternate {
 				@include endnotes-title;
-				flow: endnotes-title;
+				-daisy-flow: endnotes-title;
 			}
 		}
-		@volume {
+		@-daisy-volume {
 			@end {
-				content: flow(endnotes-title, document)
-				         flow(endnotes, volume);
+				content: -daisy-flow(endnotes-title, document)
+				         -daisy-flow(endnotes, volume);
 				page: notes;
 			}
 		}
