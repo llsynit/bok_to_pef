@@ -762,9 +762,17 @@ figure.image {
 		display: block;
 		margin: 0;
 		@include margin-left-except-within-aside(2);
-		text-indent: 2;
+		text-indent: 0;
 		&::before {
 			content: "Bildetekst: ";
+		}
+	}
+
+	/* Indent img and figcaption if they follow another element in the same figure */
+	> :not(img:not([alt]), img[alt=""], img[alt="image"]) ~ {
+		img[alt]:not([alt=""],[alt="image"])::after,
+		figcaption {
+			text-indent: 2;
 		}
 	}
 }
