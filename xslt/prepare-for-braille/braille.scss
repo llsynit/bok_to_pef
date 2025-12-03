@@ -665,7 +665,8 @@ aside {
 		text-indent: 2;
 		orphans: 3;
 
-		p:first-child {
+		/* Don't indent p if it's the first of multiple children of a sidebar */
+		p:first-child:has(~ *) {
 			text-indent: 0;
 		}
 	}
