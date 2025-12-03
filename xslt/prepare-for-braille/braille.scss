@@ -732,12 +732,19 @@ div {
 /*                Images                                                      */
 /* -------------------------------------------------------------------------- */
 
-figure.image {
+figure.image,
+figure.image-series {
 	display: block;
-	orphans: 3;
 
 	/* Empty line above */
 	margin-top: 1;
+
+	/* If multiple figures are wrapped inside an image-series, place the empty line above the outer figure,
+	 * and not in between the inner figures.
+	 */
+	figure.image-series > & {
+		margin-top: 0;
+	}
 
 	/* Empty line below */
 	+,
@@ -767,13 +774,26 @@ figure.image {
 			content: "Bildetekst: ";
 		}
 	}
+}
 
-	/* Indent img and figcaption if they follow another element in the same figure */
-	> :not(img:not([alt]), img[alt=""], img[alt="image"]) ~ {
-		img[alt]:not([alt=""],[alt="image"])::after,
-		figcaption {
-			text-indent: 2;
-		}
+/* Indent img and figcaption if they follow another element in the same figure */
+figure.image > :not(img:not([alt]), img[alt=""], img[alt="image"]) ~,
+figure.image-series > * ~ figure.image > {
+	img[alt]:not([alt=""],[alt="image"])::after,
+	figcaption {
+		text-indent: 2;
+	}
+}
+
+figure.image {
+	orphans: 3;
+}
+
+figure.image-series {
+	&::before {
+		display: block;
+		content: "Bildeserie:";
+		@include margin-left-except-within-aside(2);
 	}
 }
 
