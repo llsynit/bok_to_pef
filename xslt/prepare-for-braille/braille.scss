@@ -733,6 +733,10 @@ div {
 /* -------------------------------------------------------------------------- */
 
 figure.image {
+	display: block;
+
+	/* Empty line above */
+	margin-top: 1;
 
 	/* Empty line below */
 	+,
@@ -743,12 +747,18 @@ figure.image {
 			margin-top: 1;
 		}
 	}
-}
 
-/* Image captions */
-figure:has(img) {
-	display: block;
-	figcaption {
+	/* Show alt text for images with alt text (except decorative images) */
+	> img[alt]:not([alt=""],[alt="image"])::after {
+		display: block;
+		content: "Bilde: " attr(alt);
+		orphans: 2; /* todo check */
+		@include margin-left-except-within-aside(2);
+		text-indent: 0;
+	}
+
+	/* Image captions */
+	> figcaption {
 		display: block;
 		margin: 0;
 		@include margin-left-except-within-aside(2);
@@ -757,17 +767,6 @@ figure:has(img) {
 			content: "Bildetekst: ";
 		}
 	}
-}
-
-/* Show alt text for images with alt text (except decorative images) */
-img[alt]:not([alt=""], [alt="image"])::after {
-	display: block;
-	content: "Bilde: " attr(alt);
-	orphans: 2; /* todo check */
-	margin-top: 1;
-	margin-bottom: 0;
-	@include margin-left-except-within-aside(2);
-	text-indent: 0;
 }
 
 /* -------------------------------------------------------------------------- */
