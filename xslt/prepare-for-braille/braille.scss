@@ -643,6 +643,15 @@ blockquote {
 	text-indent: 2;
 }
 
+/* No extra margin when an element is a descendant of aside */
+@mixin margin-left-except-within-aside($margin-left) {
+	margin-left: $margin-left;
+	aside:not(.braille-aside-no-indent,
+	          .braille-aside-strek) & {
+		margin-left: 0;
+	}
+}
+
 aside {
 	margin: 1 0 1 2;
 
@@ -676,7 +685,8 @@ aside {
 	}
 
 	&[epub|type~="z3998:production"] {
-		margin: 0 0 0 2;
+		margin: 0;
+		@include margin-left-except-within-aside(2);
 
 		p:first-child {
 			display: inline;
@@ -740,9 +750,8 @@ figure:has(img) {
 	display: block;
 	figcaption {
 		display: block;
-		margin-top: 0;
-		margin-bottom: 0;
-		margin-left: 2;
+		margin: 0;
+		@include margin-left-except-within-aside(2);
 		text-indent: 2;
 		&::before {
 			content: "Bildetekst: ";
@@ -757,7 +766,7 @@ img[alt]:not([alt=""], [alt="image"])::after {
 	orphans: 2; /* todo check */
 	margin-top: 1;
 	margin-bottom: 0;
-	margin-left: 2;
+	@include margin-left-except-within-aside(2);
 	text-indent: 0;
 }
 
