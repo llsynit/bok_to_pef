@@ -34,43 +34,22 @@ $include-em: true !default;
 
 	/* Base page style that other page styles inherit from */
 	@page {
-		/* Counter for volume 1 and bodies of volumes 2, 3, ... */
+		/* Counter for body */
 		/* Numbering in new volume continues where previous volume left off */
-		/* Count pages but hide them by default (notably on title pages) */
 		counter-increment: page;
 	}
 
-	.pef-titlepage {
-		page: auto;
-	}
-
-	/* Page style for frontmatter pages in volume 1 except title page */
-	@page front-first {
-		margin-bottom: 1;
-		@bottom-center {
-			content: counter(page, lower-roman);
-		}
-	}
-
-	@volume:first {
-		@begin {
-			page: front-first;
-			// FIXME: enable in future Pipeline version
-			//counter-set: none; /* override the counter-set in @volume below */
-		}
-	}
-
-	/* Page style for title pages in volumes 2, 3, ... */
+	/* Page style for title pages */
 	@page titlepage {
 		/* Count pages but hide them */
 		counter-increment: front;
 	}
 
-	.pef-titlepage::duplicate {
+	.pef-titlepage {
 		page: titlepage;
 	}
 
-	/* Page style for other frontmatter pages in volumes 2, 3, ... */
+	/* Page style for other frontmatter pages */
 	@page front {
 		counter-increment: front;
 		margin-bottom: 1;
@@ -257,7 +236,7 @@ h1, h2, h3, h4, h5, h6 {
 
 @-daisy-volume:first {
 	@begin {
-		content: -daisy-flow(titlepage-first, document)
+		content: -daisy-flow(titlepage, document)
 		         -daisy-flow(document-toc, document)
 		         -daisy-flow(volume-toc, document)
 		         -daisy-flow(other-front, document);
@@ -273,6 +252,7 @@ h1, h2, h3, h4, h5, h6 {
 	margin-left: 1;
 	margin-right: 1;
 	hyphens: none;
+	-daisy-flow: titlepage;
 
 	& > p {
 		margin-top: 0;
@@ -280,17 +260,6 @@ h1, h2, h3, h4, h5, h6 {
 	}
 	& > .Høyre-justert {
 		text-align: right;
-	}
-
-	-daisy-flow: titlepage-first;
-	&::duplicate {
-
-		display: block;
-		margin-top: 0;
-		margin-left: 1;
-		margin-right: 1;
-		hyphens: none;
-		-daisy-flow: titlepage;
 	}
 }
 
@@ -467,7 +436,6 @@ sup {
 
 .uncontracted-letters,
 .pef-titlepage,
-.pef-titlepage::duplicate,
 h1 {
 	-daisy-text-transform: uncontracted;
 }
