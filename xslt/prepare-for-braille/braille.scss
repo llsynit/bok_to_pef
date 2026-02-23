@@ -421,7 +421,6 @@ body:not([epub|type~="frontmatter"]),
 aside[epub|type~="sidebar"],
 aside[epub|type~="epigraph"],
 aside[epub|type~="z3998:production"],
-.Rammetekst,
 section[epub|type~="z3998:poem"],
 div[epub|type~="z3998:poem"],
 section.linegroup,
@@ -506,15 +505,6 @@ hr.emptyline::before {
 /* -------------------------------------------------------------------------- */
 /*                Special classes                                             */
 /* -------------------------------------------------------------------------- */
-
-.Rammetekst {
-	margin: 1 0 1 2;
-	text-indent: 2;
-}
-
-.Rammetekst::before {
-	content: "Rammetekst: ";
-}
 
 [class*="showin-x"],
 .hidden-braille {
