@@ -284,6 +284,12 @@ h1, h2, h3, h4, h5, h6 {
 
 	-daisy-flow: titlepage-first;
 	&::duplicate {
+
+		display: block;
+		margin-top: 0;
+		margin-left: 1;
+		margin-right: 1;
+		hyphens: none;
 		-daisy-flow: titlepage;
 	}
 }
@@ -461,6 +467,7 @@ sup {
 
 .uncontracted-letters,
 .pef-titlepage,
+.pef-titlepage::duplicate,
 h1 {
 	-daisy-text-transform: uncontracted;
 }
