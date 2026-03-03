@@ -394,7 +394,6 @@ h1[epub|type~="z3998:author"] {
 section,
 body:not([epub|type~="frontmatter"]),
 aside[epub|type~="sidebar"],
-aside[epub|type~="epigraph"],
 aside[epub|type~="z3998:production"],
 section[epub|type~="z3998:poem"],
 div[epub|type~="z3998:poem"],
@@ -643,10 +642,6 @@ aside {
 		p:first-child:has(~ *) {
 			text-indent: 0;
 		}
-	}
-
-	&[epub|type~="epigraph"] {
-		text-indent: 2;
 	}
 
 	&[epub|type~="z3998:production"] {
