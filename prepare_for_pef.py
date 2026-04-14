@@ -1,12 +1,16 @@
+# Local
+from config import logger
+
+# Built-In
 import os
 import subprocess
 import shutil
 import tempfile
 import traceback
-from datetime import datetime, timedelta, timezone
 from pathlib import Path
+
+# Pip installed
 from bs4 import BeautifulSoup
-from fastapi.responses import JSONResponse
 
 # SAXON_JAR = os.environ.get("SAXON_JAR")
 # XSLT_DIR = os.environ.get("XSLT_DIR")
@@ -16,7 +20,7 @@ JING_JAR = PROJECT_ROOT / "jar" / "jing-20161127.jar"
 XSLT_DIR = PROJECT_ROOT / "xslt" / "prepare-for-braille"
 
 
-def prepare_for_pef(xhtml_path, logger):
+def prepare_for_pef(xhtml_path, tmp_dir):
 
     stylesheets = {
         "prepare-for-braille.xsl": "Tilpasser innhold for punktskrift…",
@@ -24,16 +28,8 @@ def prepare_for_pef(xhtml_path, logger):
         "add-table-classes.xsl": "Bedre håndtering av tabeller…",
         "insert-boilerplate.xsl": "Lag ny tittelside og bokinformasjon…"
     }
-    temp_output = None
-    try:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            temp_output = os.path.join(temp_dir, "output.html")
-    except Exception as e:
-        logger.error(f"Failed to create temporary directory: {e}")
-        return {
-            "success": False,
-            "errors": "Failed to create temporary directory.",
-        }
+    temp_output = os.path.join(tmp_dir, "output.html")
+
 
     for sheet, description in stylesheets.items():
         print(f"Processing stylesheet: {XSLT_DIR}/{sheet}")

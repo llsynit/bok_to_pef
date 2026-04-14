@@ -3,7 +3,7 @@ FROM python:3.12-slim
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     MODULE_NAME=bok_to_pef \
-    PORT=39013 \
+    PORT=34510 \
     APP_HOME=/app
 
 WORKDIR ${APP_HOME}
@@ -17,7 +17,7 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 # (optional) expose JAVA_HOME; path is correct on Debian for JDK/JRE 21
-ENV JAVA_HOME=/usr/lib/jvm/java-21-openjdk-arm64
+ENV JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64
 # If you also build amd64, JAVA_HOME is /usr/lib/jvm/java-21-openjdk-amd64 there.
 # You can skip JAVA_HOME entirely if your code only shells `java`.
 ENV PATH="${JAVA_HOME}/bin:${PATH}"
@@ -36,7 +36,7 @@ COPY --chown=appuser:appuser . /app
 
 USER appuser
 
-EXPOSE 39013
-HEALTHCHECK --interval=20s --timeout=3s --retries=5 CMD python -c "import socket; s=socket.create_connection(('127.0.0.1', 39013), 2); s.close()"
+EXPOSE 34510
+HEALTHCHECK --interval=20s --timeout=3s --retries=5 CMD python -c "import socket; s=socket.create_connection(('127.0.0.1', 34510), 2); s.close()"
 
-CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "39013"]
+CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "34510"]

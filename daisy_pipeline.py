@@ -1,3 +1,8 @@
+"""
+Fil laget av TIBI for å connecte opp mot Daisy Pipeline 2. Ikke lokalt laget.
+"""
+
+
 # -*- coding: utf-8 -*-
 import io
 import pathlib
