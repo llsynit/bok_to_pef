@@ -88,6 +88,9 @@ async def _setup_amqp():  # Removed "_once" - this is the only version needed
         )
         app.state.amqp_enabled = True
         
+    except asyncio.CancelledError:
+        logger.info(f"[{Config.MODULE_NAME}] AMQP setup task was cancelled")
+        raise
     except (AMQPConnectionError, OSError, ConnectionRefusedError) as e:
         # Initial connection failed - but connect_robust will keep trying in background
         logger.warning(
@@ -95,7 +98,12 @@ async def _setup_amqp():  # Removed "_once" - this is the only version needed
             "Will retry automatically in background."
         )
         app.state.amqp_enabled = False
-        raise  # Re-raise so startup handler knows it failed
+    except Exception as e:
+        logger.error(
+            f"[{Config.MODULE_NAME}] Unexpected error during AMQP connection setup: {e}",
+            exc_info=True
+        )
+        app.state.amqp_enabled = False
 
 
 # =============================================================================
@@ -430,16 +438,9 @@ async def lifespan(app: FastAPI):
     # Startup
     logger.info(f"[{Config.MODULE_NAME}] Starting up...")
     
-    # Try initial AMQP connection
-    try:
-        await _setup_amqp()
-        logger.info(f"[{Config.MODULE_NAME}] Successfully connected to RabbitMQ")
-    except Exception as e:
-        logger.warning(
-            f"[{Config.MODULE_NAME}] Initial RabbitMQ connection failed: {e}. "
-            "Application will continue without message queue. "
-            "connect_robust will retry in background."
-        )
+    # Start AMQP connection in background to avoid blocking HTTP routes
+    logger.info(f"[{Config.MODULE_NAME}] Starting AMQP connection task in background...")
+    app.state._amqp_task = asyncio.create_task(_setup_amqp())
     
     # Start cleanup loop
     logger.info("Starting artifacts cleanup loop...")
@@ -454,6 +455,13 @@ async def lifespan(app: FastAPI):
     # Shutdown
     logger.info(f"[{Config.MODULE_NAME}] Shutting down...")
     
+    # Stop AMQP setup task if still running
+    amqp_task = getattr(app.state, "_amqp_task", None)
+    if amqp_task:
+        amqp_task.cancel()
+        with suppress(asyncio.CancelledError):
+            await amqp_task
+
     # Stop cleanup loop
     task = getattr(app.state, "_cleanup_task", None)
     if task:
@@ -472,7 +480,7 @@ async def lifespan(app: FastAPI):
     conn = getattr(app.state, "amqp_conn", None)
     if conn:
         with suppress(Exception):
-            await conn
+            await conn.close()
     
     logger.info(f"[{Config.MODULE_NAME}] Shutdown complete")
 
