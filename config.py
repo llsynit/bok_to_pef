@@ -81,8 +81,8 @@ class Config:
 
 
 
-    PIP_PEF_STABLE = ast.literal_eval(os.getenv("PIP_PEF_STABLE", "(('1.14.17-p1', '6.2.0'),)"))
-    PIP_PEF_TEST = ast.literal_eval(os.getenv("PIP_PEF_TEST", "(('1.15.4-SNAPSHOT', '9.0.0'), ('1.15.2', '8.2.1'))"))
+    PIP_PEF_STABLE = ast.literal_eval(os.getenv("PIP_PEF_STABLE", "((1.15.4-SNAPSHOT', '9.0.1-SNAPSHOT'),)"))
+    PIP_PEF_TEST = ast.literal_eval(os.getenv("PIP_PEF_TEST", "(('1.15.4-SNAPSHOT', '9.0.1-SNAPSHOT'), ('1.15.2', '8.2.1'))"))
 
 
 
