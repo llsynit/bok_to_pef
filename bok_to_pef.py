@@ -194,6 +194,7 @@ def bok_to_pef(html, braille_arguments_from_queue, job_id, production_number,
         "hyphenation": 'none',
         "include-preview": 'true',
         #"include-pdf": 'true',
+        # "include-obfl": 'true',
         "hyphenation-at-page-breaks": 'except-at-volume-breaks',
         "allow-volume-break-inside-leaf-section-factor": '10',
         "prefer-volume-break-before-higher-level-factor": '1',
@@ -283,7 +284,8 @@ def bok_to_pef(html, braille_arguments_from_queue, job_id, production_number,
             else:
                 logger.info("No preview files to copy")
 
-            pip_output = dp2_pef_dir
+            # pip_output = dp2_pef_dir
+            pip_output = dp2_job.dir_output
             
             message = production_number + " ble konvertert 👍😄"
             pip_log = dp2_job.job_log
