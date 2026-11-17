@@ -18,7 +18,72 @@
     </xsl:template>-->
 
     <xsl:template match="/*">
-        <xsl:apply-templates mode="clean" select="."/>
+        <xsl:choose>
+            <xsl:when test="self::html:html[html:head/html:meta[
+                (@name = 'nordic:guidelines' and normalize-space(@content) = '2015-1')
+                or (@property = 'nordic:guidelines' and normalize-space(.) = '2015-1')
+            ]]">
+                <xsl:variable name="structured" as="element()">
+                    <xsl:apply-templates select="." mode="legacy-parts"/>
+                </xsl:variable>
+                <xsl:apply-templates select="$structured" mode="clean"/>
+            </xsl:when>
+            <xsl:otherwise>
+                <xsl:apply-templates select="." mode="clean"/>
+            </xsl:otherwise>
+        </xsl:choose>
+    </xsl:template>
+
+    <!-- In merged NG2015 input, chapters can be siblings of their part. -->
+    <xsl:template match="html:*[html:section[f:types(.) = 'part']]" mode="legacy-parts">
+        <xsl:copy>
+            <xsl:apply-templates select="@*" mode="#current"/>
+            <xsl:for-each-group select="node()"
+                group-starting-with="*[not(self::html:section[f:types(.) = 'chapter'])] | text()[normalize-space()]">
+                <xsl:choose>
+                    <xsl:when test="self::html:section[f:types(.) = 'part']
+                                    and current-group()[position() gt 1][self::html:section]">
+                        <xsl:copy>
+                            <xsl:apply-templates select="@* except @class" mode="#current"/>
+                            <xsl:attribute name="class"
+                                select="string-join(distinct-values((f:classes(.), 'pef-ng2015-part')), ' ')"/>
+                            <xsl:apply-templates select="node()" mode="#current"/>
+                            <xsl:apply-templates select="current-group()[position() gt 1]" mode="#current">
+                                <xsl:with-param name="moved-chapter" select="true()"/>
+                            </xsl:apply-templates>
+                        </xsl:copy>
+                    </xsl:when>
+                    <xsl:otherwise>
+                        <xsl:apply-templates select="current-group()" mode="#current"/>
+                    </xsl:otherwise>
+                </xsl:choose>
+            </xsl:for-each-group>
+        </xsl:copy>
+    </xsl:template>
+
+    <xsl:template match="html:section[f:types(.) = 'chapter'][html:h1 or html:hgroup/html:h1]" mode="legacy-parts">
+        <xsl:param name="moved-chapter" as="xs:boolean" select="false()"/>
+        <xsl:param name="shift-heading-level" as="xs:boolean" tunnel="yes" select="false()"/>
+        <xsl:copy>
+            <xsl:apply-templates select="@*|node()" mode="#current">
+                <xsl:with-param name="shift-heading-level" tunnel="yes"
+                    select="$moved-chapter or $shift-heading-level"/>
+            </xsl:apply-templates>
+        </xsl:copy>
+    </xsl:template>
+
+    <xsl:template match="html:h1|html:h2|html:h3|html:h4|html:h5" mode="legacy-parts">
+        <xsl:param name="shift-heading-level" as="xs:boolean" tunnel="yes" select="false()"/>
+        <xsl:choose>
+            <xsl:when test="$shift-heading-level">
+                <xsl:element name="h{xs:integer(substring(local-name(), 2)) + 1}" namespace="{namespace-uri()}">
+                    <xsl:apply-templates select="@*|node()" mode="#current"/>
+                </xsl:element>
+            </xsl:when>
+            <xsl:otherwise>
+                <xsl:next-match/>
+            </xsl:otherwise>
+        </xsl:choose>
     </xsl:template>
 
     
