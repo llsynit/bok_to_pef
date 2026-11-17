@@ -3,7 +3,7 @@ FROM python:3.12-slim
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     MODULE_NAME=bok_to_pef \
-    PORT=39013 \
+    PORT=34510 \
     APP_HOME=/app
 
 WORKDIR ${APP_HOME}
@@ -36,7 +36,7 @@ COPY --chown=appuser:appuser . /app
 
 USER appuser
 
-EXPOSE 39013
-HEALTHCHECK --interval=20s --timeout=3s --retries=5 CMD python -c "import socket; s=socket.create_connection(('127.0.0.1', 39013), 2); s.close()"
+EXPOSE 34510
+HEALTHCHECK --interval=20s --timeout=10s --start-period=20s --retries=5 CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:34510/health', timeout=5)"
 
-CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "39013"]
+CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "34510"]

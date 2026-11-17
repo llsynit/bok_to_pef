@@ -1,92 +1,184 @@
-# config.py
-import os
-import socket
-from pathlib import Path
+"""
+Felles konfigurasjon for bok_to_pef.
+
+Miljøvariabler kan overstyre Pipeline- og scriptversjonene:
+
+    PIP_PEF_STABLE_PIPELINE_VERSION
+    PIP_PEF_STABLE_SCRIPT_VERSION
+    PIP_PEF_TEST_PIPELINE_VERSION
+    PIP_PEF_TEST_SCRIPT_VERSION
+    PIP_PEF_TEST2_PIPELINE_VERSION
+    PIP_PEF_TEST2_SCRIPT_VERSION
+
+Standardverdiene samsvarer med versjonene som bok2pef.py forventer.
+"""
+
+from __future__ import annotations
+
 import logging
+import os
 import sys
-import ast
-from dotenv import load_dotenv, find_dotenv
-# loads .env if present; safe in Docker too
-load_dotenv(find_dotenv(), override=False)
+from typing import Final
 
-# -----------------------------------------------------------------------------
-# Logger
-# -----------------------------------------------------------------------------
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(message)s",
-    handlers=[logging.StreamHandler(sys.stdout)]
-)
-logger = logging.getLogger(__name__)
+def _get_log_level() -> int:
+    """
+    Finn loggnivå fra miljøvariabler.
 
-# =============================================================================
-# Config 
-# =============================================================================
+    Først forsøkes:
+
+        <MODULE_NAME>_LOG_LEVEL
+
+    Deretter:
+
+        LOG_LEVEL
+
+    Verdien kan være eksempelvis INFO, DEBUG eller et numerisk nivå.
+    """
+
+    module_name = os.getenv("MODULE_NAME", "bok_to_pef").upper()
+    value = os.getenv(
+        f"{module_name}_LOG_LEVEL",
+        os.getenv("LOG_LEVEL", "INFO"),
+    )
+
+    if isinstance(value, str):
+        stripped = value.strip()
+
+        if stripped.isdigit():
+            return int(stripped)
+
+        resolved = getattr(logging, stripped.upper(), None)
+
+        if isinstance(resolved, int):
+            return resolved
+
+    return logging.INFO
+
+
+def setup_logger() -> logging.Logger:
+    """
+    Konfigurer og returner modulens logger.
+    """
+
+    logging.basicConfig(
+        level=_get_log_level(),
+        format=(
+            "%(asctime)s - %(levelname)s - "
+            "%(name)s - %(message)s"
+        ),
+        handlers=[
+            logging.StreamHandler(sys.stdout),
+        ],
+    )
+
+    logging.getLogger(
+        "python_multipart.multipart"
+    ).setLevel(logging.WARNING)
+
+    return logging.getLogger(__name__)
+
+
+logger = setup_logger()
+
+
+class ListHandler(logging.Handler):
+    """
+    Samle loggposter i en liste.
+
+    Brukes når loggposter skal returneres til controlleren.
+    """
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.records: list[dict[str, object]] = []
+
+    def emit(self, record: logging.LogRecord) -> None:
+        self.records.append(
+            {
+                "level": record.levelname,
+                "message": record.getMessage(),
+                "timestamp": record.created,
+            }
+        )
+
+
 class Config:
-    logger.info("Initializing configuration from environment variables")
-    MODULE_NAME = os.getenv("MODULE_NAME_BOK_TO_PEF", "bok_to_pef")
-    PORT = int(os.getenv("PORT_BOK_TO_PEF", "39013"))
+    """
+    Konfigurasjon brukt av bok2pef og DaisyPipelineJob.
 
-    print(f"Starting {MODULE_NAME} on port {PORT}.....")
+    Hver PIP_PEF-verdi er en tuple av kombinasjoner:
 
-    # RabbitMQ
-    RABBITMQ_URL = None
-    RABBITMQ_URL_DOCKER = os.getenv("RABBITMQ_URL_DOCKER")
-    RABBITMQ_URL_LOCAL = os.getenv("RABBITMQ_URL_LOCAL")
+        (
+            ("pipeline-versjon", "script-versjon"),
+            ...
+        )
 
-    if RABBITMQ_URL_DOCKER:
-        try:
-            # check if Docker hostname is resolvable
-            socket.gethostbyname("rabbitmq")
-            RABBITMQ_URL = RABBITMQ_URL_DOCKER
-            print("Using RABBITMQ_URL_DOCKER")
-        except socket.gaierror:
-            if RABBITMQ_URL_LOCAL:
-                RABBITMQ_URL = RABBITMQ_URL_LOCAL
-                print("Docker hostname not found, falling back to RABBITMQ_URL_LOCAL")
-            else:
-                raise RuntimeError(
-                    "RabbitMQ hostname not resolvable and no local URL set")
-    elif RABBITMQ_URL_LOCAL:
-        RABBITMQ_URL = RABBITMQ_URL_LOCAL
-        print("Using RABBITMQ_URL_LOCAL")
-    else:
-        raise RuntimeError(
-            "Either RABBITMQ_URL_DOCKER or RABBITMQ_URL_LOCAL must be set")
+    Dette er viktig fordi bok2pef.py gjør:
 
-    print(f"Connecting to RabbitMQ: {RABBITMQ_URL}")
+        [
+            *Config.PIP_PEF_STABLE,
+            *Config.PIP_PEF_TEST,
+        ]
+    """
 
-    WORK_EXCHANGE = os.getenv("WORK_EXCHANGE", "work.ex")            # direct
-    RESULTS_EXCHANGE = os.getenv("RESULTS_EXCHANGE", "results.ex")   # topic
-    WORK_ROUTING_KEY = os.getenv(
-        "WORK_ROUTING_KEY_BOK_TO_PEF", "nordic_to_bok")     # stage name
-    WORK_QUEUE_NAME = os.getenv(
-        "WORK_QUEUE_NAME_BOK_TO_PEF", "nordic_to_bok.q")     # durable queue
+    MODULE_NAME: Final[str] = os.getenv(
+        "MODULE_NAME",
+        "bok_to_pef",
+    )
 
-    # Artifacts are EPHEMERAL here — the controller should fetch and persist them.
-    WORKER_BASE_URL = os.getenv(
-        "WORKER_BASE_URL_BOK_TO_PEF", f"http://{MODULE_NAME}:{PORT}")
+    MODULE_VERSION: Final[str] = os.getenv(
+        "BOK_TO_PEF_VERSION",
+        os.getenv(
+            f"{MODULE_NAME.upper()}_VERSION",
+            "unknown",
+        ),
+    )
 
+    PIP_PEF_STABLE: Final[tuple[tuple[str, str], ...]] = (
+        (
+            os.getenv(
+                "PIP_PEF_STABLE_PIPELINE_VERSION",
+                "1.14.17-p1",
+            ),
+            os.getenv(
+                "PIP_PEF_STABLE_SCRIPT_VERSION",
+                "6.2.0",
+            ),
+        ),
+    )
 
-    BASE_DIR = Path(__file__).parent
-    ARTIFACTS_ROOT = (BASE_DIR / "artifacts").resolve()
-    ARTIFACTS_ROOT.mkdir(parents=True, exist_ok=True)
+    PIP_PEF_TEST: Final[tuple[tuple[str, str], ...]] = (
+        (
+            os.getenv(
+                "PIP_PEF_TEST_PIPELINE_VERSION",
+                "1.15.4-SNAPSHOT",
+            ),
+            os.getenv(
+                "PIP_PEF_TEST_SCRIPT_VERSION",
+                "9.0.0",
+            ),
+        ),
+        (
+            os.getenv(
+                "PIP_PEF_TEST2_PIPELINE_VERSION",
+                "1.15.2",
+            ),
+            os.getenv(
+                "PIP_PEF_TEST2_SCRIPT_VERSION",
+                "8.2.1",
+            ),
+        ),
+    )
 
-    ARTIFACTS_RETENTION_HOURS = int(
-        os.getenv("ARTIFACTS_RETENTION_HOURS", "24"))  # default 24h
-    ARTIFACTS_CLEAN_INTERVAL_SEC = int(
-        os.getenv("ARTIFACTS_CLEAN_INTERVAL_SEC", "900"))  # default 15 min
+    ARTIFACTS_DIR: Final[str] = os.getenv(
+        "ARTIFACTS_DIR",
+        "artifacts",
+    )
 
-
-
-
-    PIP_PEF_STABLE = ast.literal_eval(os.getenv("PIP_PEF_STABLE", "((1.15.4-SNAPSHOT', '9.0.1-SNAPSHOT'),)"))
-    PIP_PEF_TEST = ast.literal_eval(os.getenv("PIP_PEF_TEST", "(('1.15.4-SNAPSHOT', '9.0.1-SNAPSHOT'), ('1.15.2', '8.2.1'))"))
-
-
-
-    logger.info (".env Daisy pipeline html_to_pef versions:")
-    logger.info (f"PIP_PEF_STABLE: {PIP_PEF_STABLE}")
-    logger.info (f"PIP_PEF_TEST: {PIP_PEF_TEST}")
-    logger.info("Configuration initialized.")
+    ARTIFACTS_RETENTION_HOURS: Final[int] = int(
+        os.getenv(
+            "ARTIFACTS_RETENTION_HOURS",
+            "24",
+        )
+    )
