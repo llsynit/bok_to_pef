@@ -103,7 +103,13 @@ $include-em: true !default;
 			string-set: print-page attr(title)
 			            print-page-break-indicator "⠿";
 		}
-		&:not([title]) {
+		/* Nordic Guidelines 2020-1 and later use aria-label on empty markers. */
+		&:not([title])[aria-label]:not([aria-label=""]) {
+			string-set: print-page attr(aria-label)
+			            print-page-break-indicator "⠿";
+		}
+		&:not([title]):not([aria-label]),
+		&:not([title])[aria-label=""] {
 			string-set: print-page content()
 			            print-page-break-indicator "⠿";
 		}
