@@ -597,7 +597,14 @@ def build_result_zip(
     primary_name = None
 
     if primary_path is not None:
-        primary_name = primary_path.relative_to(job_folder).as_posix()
+        delivered_path = primary_path.relative_to(job_folder)
+        if (primary_path.suffix.lower() == ".pef"
+                and production_number.isascii() and production_number.isdigit()
+                and production_number.endswith("0")):
+            delivered_path = delivered_path.with_name(production_number[:-1] + "3.pef")
+            if (job_folder / delivered_path).exists() and job_folder / delivered_path != primary_path:
+                raise ValueError(f"Duplicate PEF delivery name: {delivered_path}")
+        primary_name = delivered_path.as_posix()
 
     manifest = {
         "primary": primary_name,
@@ -685,7 +692,7 @@ def build_result_zip(
 
             archive.write(
                 artifact,
-                arcname=relative_name,
+                arcname=primary_name if artifact == primary_path else relative_name,
             )
 
     zip_name = f"{production_number}.zip"
