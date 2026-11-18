@@ -201,7 +201,7 @@
     <xsl:template match="html:body[count(../html:body) = 1]" mode="clean">
         <xsl:copy exclude-result-prefixes="#all">
             <xsl:apply-templates select="@* | node()" mode="#current"/>
-            <xsl:for-each select="*[f:types(.) = ('colophon', 'copyright-page')]">
+            <xsl:for-each select="(* | html:section/html:section)[f:types(.) = ('colophon', 'copyright-page')]">
                 <xsl:copy exclude-result-prefixes="#all">
                     <xsl:apply-templates select="@*" mode="#current"/>
                     <xsl:attribute name="epub:type" select="string-join(distinct-values((f:types(.)[not(.=('cover','frontmatter','bodymatter'))], 'backmatter')),' ')"/>
