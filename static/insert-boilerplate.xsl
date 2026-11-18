@@ -29,6 +29,8 @@
         </xsl:copy>
     </xsl:template>
 
+    <xsl:template match="nlb:titlepage-fields" />
+
     <xsl:template match="html:html">
         <xsl:copy>
             <xsl:apply-templates select="@*" />
@@ -91,7 +93,7 @@
         <xsl:variable name="namespace-uri" select="namespace-uri()" />
 
         <xsl:variable name="source-titlepage"
-            select="(//html:*[tokenize(@epub:type,'\s+')='titlepage'])[1]" />
+            select="(//nlb:titlepage-fields | //html:*[tokenize(@epub:type,'\s+')='titlepage'])[1]" />
         <xsl:variable name="source-heading"
             select="($source-titlepage/descendant-or-self::html:*[tokenize(@epub:type,'\s+')='fulltitle'])[1]" />
         <xsl:variable name="author"
@@ -421,6 +423,14 @@
 
 
        <xsl:choose>
+                <xsl:when test="$source-titlepage/self::nlb:titlepage-fields and count($author) = 2 and $authors-fit">
+                    <xsl:for-each select="$author-lines">
+                        <xsl:call-template name="row">
+                            <xsl:with-param name="content" select="." />
+                            <xsl:with-param name="namespace-uri" select="$namespace-uri" />
+                        </xsl:call-template>
+                    </xsl:for-each>
+                </xsl:when>
                 <xsl:when test="count($author)=1">  <!-- delimiter found use old style input from
                     bibliofil -->
          <xsl:if test="contains($author,';')">

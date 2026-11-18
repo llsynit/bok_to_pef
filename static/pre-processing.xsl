@@ -185,6 +185,15 @@
         </xsl:element>
     </xsl:template>
     
+    <!-- Carry title-page fields to the generated front matter before cleaning the source page. -->
+    <xsl:template match="html:body[f:types(.)='titlepage'] | html:body/html:section[f:types(.)='titlepage']"
+                  mode="clean" priority="3">
+        <nlb:titlepage-fields xmlns:nlb="http://www.nlb.no/ns/pipeline/xslt">
+            <xsl:copy-of select="(.//*[f:types(.)='fulltitle'])[1],
+                                 .//*[f:types(.)='z3998:author']"/>
+        </nlb:titlepage-fields>
+    </xsl:template>
+
     <!-- remove existing titlepage if present -->
     <xsl:template match="dtbook:level1[f:classes(.) = ('titlepage', 'halftitlepage')]" mode="clean" priority="2"/>
     <xsl:template match="html:body[f:types(.) = ('titlepage', 'halftitlepage')]" mode="clean" priority="2"/>
