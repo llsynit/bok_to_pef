@@ -90,6 +90,10 @@
     <xsl:template name="generate-frontmatter">
         <xsl:variable name="namespace-uri" select="namespace-uri()" />
 
+        <xsl:variable name="source-titlepage"
+            select="(//html:*[tokenize(@epub:type,'\s+')='titlepage'])[1]" />
+        <xsl:variable name="source-heading"
+            select="($source-titlepage/descendant-or-self::html:*[tokenize(@epub:type,'\s+')='fulltitle'])[1]" />
         <xsl:variable name="author"
             as="xs:string*">
             <xsl:choose>
@@ -107,17 +111,11 @@
                 </xsl:when>
                 <xsl:otherwise>
                     <xsl:choose>
-                        <xsl:when
-                            test="count(//html:body//html:*[tokenize(@epub:type,'\s+')='z3998:author'])">
-                            <xsl:sequence
-                                select="//html:head/html:meta[@name='dc:creator']/string(@content)" />
-                            <!-- We don't use z3998:author-->
-                            <!--  <xsl:sequence
-                            select="//html:body//html:*[tokenize(@epub:type,'\s+')='z3998:author']/nlb:element-text(.)"/>-->
+                        <xsl:when test="//html:head/html:meta[@name='dc:creator'][normalize-space(@content)]">
+                            <xsl:sequence select="//html:head/html:meta[@name='dc:creator'][normalize-space(@content)]/string(@content)" />
                         </xsl:when>
                         <xsl:otherwise>
-                            <xsl:sequence
-                                select="//html:head/html:meta[@name='dc:creator']/string(@content)" />
+                            <xsl:sequence select="$source-titlepage//html:*[tokenize(@epub:type,'\s+')='z3998:author'][normalize-space(.)]/normalize-space(.)" />
                         </xsl:otherwise>
                     </xsl:choose>
                 </xsl:otherwise>
@@ -161,7 +159,7 @@
                 </xsl:when>
                 <xsl:otherwise>
                     <xsl:sequence
-                        select="(//html:body//html:*[tokenize(@epub:type,'\s+')='title'])[1]/nlb:element-text(.)" />
+                        select="($source-heading//html:*[tokenize(@epub:type,'\s+')='title'][normalize-space(.)])[1]/normalize-space(.)" />
                 </xsl:otherwise>
             </xsl:choose>
         </xsl:variable>
@@ -174,7 +172,8 @@
                 </xsl:when>
                 <xsl:otherwise>
                     <xsl:sequence
-                        select="//html:head/html:meta[@name = 'dc:title.subTitle']/string(@content)" />
+                        select="(//html:head/html:meta[@name='dc:title.subTitle'][normalize-space(@content)]/@content,
+                                 $source-heading//html:*[tokenize(@epub:type,'\s+')='subtitle'][normalize-space(.)])[1]/normalize-space(.)" />
                 </xsl:otherwise>
             </xsl:choose>
         </xsl:variable>
@@ -301,12 +300,15 @@
         <xsl:variable
             name="forlag-sted-årstall" as="xs:string*">
 
-            <xsl:sequence select="concat($forlag, ', ', $sted , ', ', $årstall)" />
+            <xsl:sequence select="string-join(($forlag, $sted, $årstall)[normalize-space(.)], ', ')" />
 
         </xsl:variable>
          <xsl:variable
             name="utgave" as="xs:string*">
             <xsl:choose>
+                <xsl:when test="empty($utgave-nummer[normalize-space(.)])">
+                    <xsl:sequence select="''" />
+                </xsl:when>
                 <xsl:when test="$language-id = 'Bokmål'">
                     <xsl:sequence select="concat('Utgave  ', $utgave-nummer)" />
                 </xsl:when>
@@ -487,7 +489,7 @@
 
               <xsl:call-template
                 name="row">
-                <xsl:with-param name="content" select="$fulltitle" />
+                <xsl:with-param name="content" select="if ($namespace-uri = $html-namespace and $title and $subtitle) then $title else $fulltitle" />
 
                 <xsl:with-param name="namespace-uri" select="$namespace-uri" />
 
