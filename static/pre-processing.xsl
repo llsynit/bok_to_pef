@@ -19,15 +19,18 @@
 
     <xsl:template match="/*">
         <xsl:variable name="profile-meta" select="self::html:html/html:head/html:meta"/>
-        <xsl:variable name="profiles" select="distinct-values((
+        <xsl:variable name="declarations" select="(
             $profile-meta[@property='nordic:guidelines']/normalize-space(.),
             $profile-meta[@name='nordic:guidelines']/normalize-space(@content)
-        )[. != ''])"/>
-        <xsl:variable name="legacy-parts" select="$profiles = '2015-1'"/>
+        )[. != '']"/>
+        <xsl:variable name="profiles" select="distinct-values($declarations)"/>
+        <xsl:variable name="effective" select="$declarations[1]"/>
+        <xsl:variable name="legacy-parts" select="$effective = '2015-1'"/>
         <xsl:message select="concat('Nordic Guidelines: declared=',
             if (empty($profiles)) then 'undeclared' else string-join($profiles, ','),
             ', conflict=', count($profiles) gt 1,
-            ', part-preprocessing=', if ($legacy-parts) then 'legacy-parts' else 'standard')"/>
+            ', part-preprocessing=', if ($legacy-parts) then 'legacy-parts' else 'standard',
+            ', effective=', if ($effective) then $effective else 'undeclared')"/>
         <xsl:choose>
             <xsl:when test="$legacy-parts">
                 <xsl:variable name="structured" as="element()">
