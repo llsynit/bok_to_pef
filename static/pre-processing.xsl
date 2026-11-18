@@ -61,6 +61,17 @@
         </xsl:copy>
     </xsl:template>
 
+    <!-- Already nested chapters use the same whole-book TOC style. -->
+    <xsl:template match="html:section[f:types(.) = 'part']
+                        [html:section[f:types(.) = 'chapter'][html:h2 or html:hgroup/html:h2]]"
+                  mode="legacy-parts">
+        <xsl:copy>
+            <xsl:apply-templates select="@* except @class" mode="#current"/>
+            <xsl:attribute name="class" select="string-join(distinct-values((f:classes(.), 'pef-ng2015-part')), ' ')"/>
+            <xsl:apply-templates select="node()" mode="#current"/>
+        </xsl:copy>
+    </xsl:template>
+
     <xsl:template match="html:section[f:types(.) = 'chapter'][html:h1 or html:hgroup/html:h1]" mode="legacy-parts">
         <xsl:param name="moved-chapter" as="xs:boolean" select="false()"/>
         <xsl:param name="shift-heading-level" as="xs:boolean" tunnel="yes" select="false()"/>
