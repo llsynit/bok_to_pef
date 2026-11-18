@@ -15,6 +15,10 @@
         </xsl:copy>
     </xsl:template>
     
+    <!-- The EPUB stylesheet is outside the PEF job context. -->
+    <xsl:template match="html/head/link[tokenize(lower-case(normalize-space(@rel)), '\s+') = 'stylesheet']
+                         [normalize-space(@href) = ('css/ebok.css', './css/ebok.css')]"/>
+
     <xsl:template match="title/text()">
         <xsl:value-of select="normalize-space()"/>
     </xsl:template>
